@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/plugins/">
+    <Project Path="plugins/PromptOps.Plugin.Sdk/PromptOps.Plugin.Sdk.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/PromptOps.Application/PromptOps.Application.csproj" />
+    <Project Path="src/PromptOps.Domain/PromptOps.Domain.csproj" />
+    <Project Path="src/PromptOps.Host/PromptOps.Host.csproj" />
+    <Project Path="src/PromptOps.Infrastructure/PromptOps.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PromptOps.Architecture.Tests/PromptOps.Architecture.Tests.csproj" />
+    <Project Path="tests/PromptOps.Domain.Tests/PromptOps.Domain.Tests.csproj" />
+    <Project Path="tests/PromptOps.Host.Tests/PromptOps.Host.Tests.csproj" />
+  </Folder>
+</Solution>

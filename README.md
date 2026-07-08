@@ -34,4 +34,34 @@ See [`docs/architecture.md`](docs/architecture.md) for the full architecture and
 
 ## Status
 
-Phase 0 (architecture decision + project plan) is complete; no implementation exists yet. Each subsequent phase ships working software and is reviewed before the next begins — see [`docs/project-plan.md`](docs/project-plan.md) for the current phase breakdown.
+Phase 0 (architecture decision + project plan) and Phase 1 (domain core + solution skeleton) are complete. Each subsequent phase ships working software and is reviewed before the next begins — see [`docs/project-plan.md`](docs/project-plan.md) for the current phase breakdown.
+
+## Solution layout
+
+```
+PromptOps.slnx
+src/
+  PromptOps.Domain          entities/value objects, zero dependencies (ADR-0002)
+  PromptOps.Application     use cases, provider interfaces/ports (ADR-0003), depends only on Domain
+  PromptOps.Infrastructure  default implementations of Application's ports (EF Core/SQLite, etc.)
+  PromptOps.Host            the daemon's composition root and entry point (ADR-0009)
+plugins/
+  PromptOps.Plugin.Sdk      IPromptOpsPlugin — the contract daemon-side provider plugins implement
+tests/
+  PromptOps.Domain.Tests        unit tests for Domain
+  PromptOps.Architecture.Tests  NetArchTest fitness tests enforcing the layering rule above
+  PromptOps.Host.Tests          integration tests against the Host (WebApplicationFactory)
+```
+
+Dependencies point inward only: `Domain` ← `Application` ← `Infrastructure`/`Host`. `PromptOps.Architecture.Tests` fails the build if that's ever violated — see [`docs/architecture.md`](docs/architecture.md) ADR-0002.
+
+## Building and testing
+
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+
+```
+dotnet build
+dotnet test
+```
+
+Both run against every project in the solution; no external services (no database, no Docker) are required yet — that starts changing from Phase 2 onward.

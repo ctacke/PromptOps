@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\PromptOps.Application\PromptOps.Application.csproj" />
+    <ProjectReference Include="..\PromptOps.Infrastructure\PromptOps.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\plugins\PromptOps.Plugin.Sdk\PromptOps.Plugin.Sdk.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
