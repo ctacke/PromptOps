@@ -22,7 +22,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IExecutionRepository, ExecutionRepository>();
         services.AddScoped<IEngineeringMetricsRepository, EngineeringMetricsRepository>();
         services.AddScoped<IHumanEvaluationRepository, HumanEvaluationRepository>();
+        services.AddScoped<IAIEvaluationRepository, AIEvaluationRepository>();
         services.AddSingleton<IAIExecutionProvider, ManualAIExecutionProvider>();
+        services.AddScoped<IAIEvaluationProvider, AIJudgeEvaluationProvider>();
         services.AddSingleton<ISecretProvider, EnvironmentSecretProvider>();
 
         return services;
