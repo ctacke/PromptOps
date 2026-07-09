@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PromptOps.Application.Executions;
 using PromptOps.Application.Prompts;
+using PromptOps.Application.Providers;
 using PromptOps.Infrastructure.Persistence;
+using PromptOps.Infrastructure.Providers;
 
 namespace PromptOps.Infrastructure;
 
@@ -14,6 +17,8 @@ public static class ServiceCollectionExtensions
 
         services.AddDbContext<PromptOpsDbContext>(options => options.UseSqlite(connectionString));
         services.AddScoped<IPromptRepository, PromptRepository>();
+        services.AddScoped<IExecutionRepository, ExecutionRepository>();
+        services.AddSingleton<IAIExecutionProvider, ManualAIExecutionProvider>();
 
         return services;
     }

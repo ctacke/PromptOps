@@ -34,7 +34,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full architecture and
 
 ## Status
 
-Phase 0 (architecture decision + project plan), Phase 1 (domain core + solution skeleton), and Phase 2 (prompt repository — EF Core/SQLite persistence, see [`docs/prompt-repository.md`](docs/prompt-repository.md)) are complete. Each subsequent phase ships working software and is reviewed before the next begins — see [`docs/project-plan.md`](docs/project-plan.md) for the current phase breakdown.
+Phase 0 (architecture decision + project plan), Phase 1 (domain core + solution skeleton), Phase 2 (prompt repository — EF Core/SQLite persistence, see [`docs/prompt-repository.md`](docs/prompt-repository.md)), and Phase 3 (execution tracking — see [`docs/execution-tracking.md`](docs/execution-tracking.md)) are complete. Each subsequent phase ships working software and is reviewed before the next begins — see [`docs/project-plan.md`](docs/project-plan.md) for the current phase breakdown.
 
 ## Solution layout
 

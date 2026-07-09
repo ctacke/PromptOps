@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PromptOps.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using PromptOps.Infrastructure.Persistence;
 namespace PromptOps.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PromptOpsDbContext))]
-    partial class PromptOpsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260709001405_AddExecutionTracking")]
+    partial class AddExecutionTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -48,10 +51,6 @@ namespace PromptOps.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Inputs")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Languages")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

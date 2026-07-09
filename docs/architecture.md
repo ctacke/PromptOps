@@ -107,7 +107,9 @@ Each interface is versioned independently (semantic versioning on the `Applicati
 ### ADR-0008: Extensibility beyond providers
 
 Two additional extension points beyond the provider interfaces, needed for the roadmap items (A/B testing, replay, synthetic benchmarks):
-- **Domain events** (`ExecutionRecorded`, `MetricsCollected`, `EvaluationSubmitted`, `ScoreComputed`) published via an in-process mediator (MediatR) so future features (e.g. a regression-suite runner) subscribe without modifying the phase that produced the event.
+- **Domain events** (`ExecutionRecorded`, `MetricsCollected`, `EvaluationSubmitted`, `ScoreComputed`) published via an in-process publisher so future features (e.g. a regression-suite runner) subscribe without modifying the phase that produced the event.
+
+  **Amendment (Phase 3):** originally specified as MediatR. Before adding the package, its license was checked directly (`LICENSE.md` bundled in the NuGet package) rather than assumed — MediatR 14.x is dual-licensed under RPL 1.5 (copyleft: distributing software built with it obligates releasing that software's own source under the same terms) or a paid commercial license. Both are incompatible with this project's "open-source friendly" requirement, so it was dropped in favor of a small hand-rolled dispatcher: `Domain` defines a framework-free `IDomainEvent` marker + `AggregateRoot` (accumulates events), `Application` defines `IDomainEventHandler<TEvent>`/`IDomainEventPublisher`, and `DomainEventPublisher` resolves handlers via DI reflectively. No pipeline behaviors, no request/response mediation — just publish-to-registered-handlers, which is all that's needed today. See `docs/execution-tracking.md` for the implementation.
 - **Configuration-driven scoring** — `ScoringConfig` weights are data, not code, so new scoring strategies are a config change, not a deploy, for the common case (only genuinely new *inputs* require code).
 
 ### ADR-0009: Distribution and packaging — Docker daemon + thin Claude Code plugin
@@ -145,7 +147,7 @@ ExecutionRecord
  ├─ id, promptVersionId, timestamp, developerId
  ├─ DevelopmentContext (value object, assembled from IContextProvider results):
  │    repository, branch, commit, taskId, referencedDocuments[], referencedADRs[],
- │    acceptanceCriteria[]
+ │    acceptanceCriteria[], languages[] (hook-detected, e.g. "csharp" — Phase 3/4b)
  ├─ inputs (json), output (text or IArtifactProvider ref for large output)
  ├─ executionTimeMs, aiProviderId, model, modelParameters (json)
  ├─ toolUsage[] (name, count, durationMs)

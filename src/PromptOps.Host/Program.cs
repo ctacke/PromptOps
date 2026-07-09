@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PromptOps.Application;
+using PromptOps.Host.Endpoints;
 using PromptOps.Infrastructure;
 using PromptOps.Infrastructure.Persistence;
 using PromptOps.Plugin.Sdk;
@@ -25,6 +26,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapGet("/health", () => Results.Ok(new HealthResponse("ok", plugins.Count)));
+app.MapExecutionEndpoints();
 
 app.Run();
 
