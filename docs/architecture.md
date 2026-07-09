@@ -60,6 +60,7 @@ All external capability is expressed as an interface in `Application`. Initial s
 | `IArtifactProvider` | Persists/retrieves large artifacts (diffs, logs, transcripts) outside the relational store | `BlobArtifactProvider` (filesystem/S3/Azure Blob) |
 | `IScoringProvider` | Computes a `PromptScore` from weighted inputs under a `ScoringConfig` | `WeightedSumScoringProvider` (default, built into Infrastructure) |
 | `IRecommendationProvider` | Ranks/searches historical prompt versions for a new task | `TagAndHistoryRecommendationProvider` (v1), `SemanticRecommendationProvider` (v2, Phase 10) |
+| `IActivityClassifier` | Classifies a free-text task description into activity tags (e.g. "debugging", "code-authoring") before recommendation runs — the input `IRecommendationProvider.RecommendAsync(tags)` needs but that nothing else produces for a live session | `AIActivityClassifier` (built on `IAIExecutionProvider`, same pattern as `IAIEvaluationProvider` — no separate AI dependency) |
 | `ISecretProvider` | Resolves credentials for plugins without the plugin owning secret storage | `EnvironmentSecretProvider` (default), `KeyVaultSecretProvider` |
 
 Each interface is versioned independently (semantic versioning on the `Application` contracts package) so a plugin built against v1 doesn't silently break when v2 adds a method — new capabilities are added via new, optional interfaces (e.g. `IMetricCollectorV2 : IMetricCollector`) rather than breaking changes.

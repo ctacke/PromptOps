@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPromptOpsApplication();
 builder.Services.AddPromptOpsInfrastructure(builder.Configuration);
+builder.Services.AddMcpServer().WithHttpTransport().WithToolsFromAssembly();
 
 // Plugin discovery/loading (ADR-0004) is stubbed until Phase 5 — the daemon boots with an
 // empty plugin set today. Once real, this becomes a scan of the configured plugins directory.
@@ -27,6 +28,7 @@ using (var scope = app.Services.CreateScope())
 
 app.MapGet("/health", () => Results.Ok(new HealthResponse("ok", plugins.Count)));
 app.MapExecutionEndpoints();
+app.MapMcp("/mcp");
 
 app.Run();
 

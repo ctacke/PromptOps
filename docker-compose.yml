@@ -1,0 +1,18 @@
+services:
+  promptops-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: promptops-daemon:latest
+    container_name: promptops-daemon
+    restart: unless-stopped
+    ports:
+      # Loopback only (ADR-0007): never bind 0.0.0.0 here. Docker still needs the
+      # container itself to listen on 0.0.0.0:8080 internally; this mapping is what
+      # keeps the daemon unreachable from outside the host machine.
+      - "127.0.0.1:5179:8080"
+    volumes:
+      - promptops-data:/data
+
+volumes:
+  promptops-data:

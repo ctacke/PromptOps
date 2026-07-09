@@ -151,13 +151,15 @@ Two artifacts run through every phase from Phase 4 onward: the **daemon** (Docke
 
 **Deliverables**
 - `IRecommendationProvider` interface + tag-search/historical-`PromptScore`-ranking implementation, querying across **all repos in the shared database by default**, filterable to the current repo.
-- `/promptops recommend` skill fully wired, plus an MCP tool so the agent can call it mid-session.
+- `IActivityClassifier` interface + `AIActivityClassifier` (built on `IAIExecutionProvider`, same "reuse the provider abstraction" pattern as `IAIEvaluationProvider` — no separate AI dependency): classifies a free-text task description into activity tags before recommendation runs. This is the piece that fills the gap identified when Phase 3 shipped — nothing previously produced the tags `RecommendAsync` needs for a session that's just starting.
+- `/promptops recommend` skill fully wired as classify-then-recommend (task description → `IActivityClassifier` → tags → `IRecommendationProvider`), plus an MCP tool so the agent can call it mid-session. The developer supplies a task description, not tags — classification is internal, not a separate user-facing step.
 
 **Acceptance criteria**
 - Given tags/category, returns ranked prompt versions with a stated rationale (not a black-box score), drawing on history from any repo on the machine.
 - A brand-new repo with zero history of its own still gets useful recommendations if a similar task has been run in another repo.
+- Given a free-text task description, `IActivityClassifier` returns tags that plausibly match its activity (e.g. a description containing a stack trace/error message classifies toward debugging-flavored tags) without the developer declaring a category themselves.
 
-**Testing:** integration tests with seeded execution/score history across multiple simulated repos.
+**Testing:** integration tests with seeded execution/score history across multiple simulated repos; classifier tests against a stub `IAIExecutionProvider` with canned task descriptions and expected tag categories (same pattern as Phase 7's planned AI evaluation tests).
 
 **Docs:** `docs/recommendations.md`.
 
