@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using PromptOps.Application.Evaluations;
 using PromptOps.Application.Events;
 using PromptOps.Application.Executions;
 using PromptOps.Application.Metrics;
@@ -13,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<PromptService>();
         services.AddScoped<ExecutionService>();
         services.AddScoped<MetricsCollectionService>();
+        services.AddScoped<HumanEvaluationService>();
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         return services;
     }

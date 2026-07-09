@@ -38,14 +38,8 @@ Per ADR-0007, the daemon must never be reachable from outside the host machine. 
 
 ## Surfaces exposed
 
-- **Loopback ingestion API** — `http://127.0.0.1:5179/executions/...` — what Claude Code hooks call (Phase 4b). See `docs/execution-tracking.md` for the endpoint contract.
-- **MCP over HTTP** — `http://127.0.0.1:5179/mcp` (streamable HTTP transport). Register it as a remote MCP server in Claude Code:
-
-  ```
-  claude mcp add --transport http promptops http://127.0.0.1:5179/mcp
-  ```
-
-  Today it exposes two tools — `health_check` and `version` — enough to prove connectivity. Real tools (search history, get a recommendation, submit a rating) land as the use cases behind them are built in later phases.
+- **Loopback ingestion API** — `http://127.0.0.1:5179/executions/...` — what Claude Code hooks call (Phase 4b). See `docs/execution-tracking.md`, `docs/metrics.md`, and `docs/human-evaluation.md` for the endpoint contracts (execution tracking, engineering metrics, human evaluation).
+- **MCP over HTTP** — `http://127.0.0.1:5179/mcp` (streamable HTTP transport). Registered automatically when the Claude Code plugin is installed (Phase 4b) — no manual `claude mcp add` step needed from inside a repo that has the plugin. Current tools: `health_check`, `version`, `submit_human_evaluation`, `get_human_evaluations`. More land as the use cases behind them are built in later phases.
 
 ## Metric-collector plugins
 

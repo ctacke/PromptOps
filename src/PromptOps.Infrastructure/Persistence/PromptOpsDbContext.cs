@@ -8,6 +8,7 @@ public sealed class PromptOpsDbContext(DbContextOptions<PromptOpsDbContext> opti
     public DbSet<PromptRecord> Prompts => Set<PromptRecord>();
     public DbSet<ExecutionRecordEntity> Executions => Set<ExecutionRecordEntity>();
     public DbSet<EngineeringMetricsEntity> EngineeringMetrics => Set<EngineeringMetricsEntity>();
+    public DbSet<HumanEvaluationEntity> HumanEvaluations => Set<HumanEvaluationEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -30,6 +30,7 @@ using (var scope = app.Services.CreateScope())
 app.MapGet("/health", () => Results.Ok(new HealthResponse("ok", plugins.Count)));
 app.MapExecutionEndpoints();
 app.MapMetricsEndpoints();
+app.MapEvaluationEndpoints();
 app.MapMcp("/mcp");
 
 app.Run();

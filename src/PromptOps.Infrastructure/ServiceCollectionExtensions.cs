@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PromptOps.Application.Evaluations;
 using PromptOps.Application.Executions;
 using PromptOps.Application.Metrics;
 using PromptOps.Application.Prompts;
@@ -20,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPromptRepository, PromptRepository>();
         services.AddScoped<IExecutionRepository, ExecutionRepository>();
         services.AddScoped<IEngineeringMetricsRepository, EngineeringMetricsRepository>();
+        services.AddScoped<IHumanEvaluationRepository, HumanEvaluationRepository>();
         services.AddSingleton<IAIExecutionProvider, ManualAIExecutionProvider>();
         services.AddSingleton<ISecretProvider, EnvironmentSecretProvider>();
 
