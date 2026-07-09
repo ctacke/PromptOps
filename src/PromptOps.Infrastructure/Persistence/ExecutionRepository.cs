@@ -32,6 +32,23 @@ public sealed class ExecutionRepository(PromptOpsDbContext db) : IExecutionRepos
         return ExecutionMapper.ToDomain(entity);
     }
 
+    public async Task<IReadOnlyList<ExecutionRecord>> GetByPromptVersionIdAsync(Guid promptVersionId, CancellationToken cancellationToken = default)
+    {
+        // SQLite can't ORDER BY DateTimeOffset in SQL (see LoadFullEntityAsync) — sort client-side after load.
+        var entities = await db.Executions
+            .Include(e => e.ToolUsage)
+            .Where(e => e.PromptVersionId == promptVersionId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var entity in entities)
+        {
+            entity.ToolUsage.Sort((a, b) => a.RecordedAt.CompareTo(b.RecordedAt));
+            _tracked[entity.Id] = entity;
+        }
+
+        return entities.OrderBy(e => e.Timestamp).Select(ExecutionMapper.ToDomain).ToList();
+    }
+
     public Task UpdateAsync(ExecutionRecord execution, CancellationToken cancellationToken = default)
     {
         if (!_tracked.TryGetValue(execution.Id, out var entity))

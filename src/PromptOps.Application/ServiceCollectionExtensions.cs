@@ -4,6 +4,7 @@ using PromptOps.Application.Events;
 using PromptOps.Application.Executions;
 using PromptOps.Application.Metrics;
 using PromptOps.Application.Prompts;
+using PromptOps.Application.Scoring;
 
 namespace PromptOps.Application;
 
@@ -16,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MetricsCollectionService>();
         services.AddScoped<HumanEvaluationService>();
         services.AddScoped<AIEvaluationService>();
+        services.AddScoped<ScoringService>();
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         return services;
     }

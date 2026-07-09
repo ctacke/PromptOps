@@ -96,6 +96,7 @@ public sealed class PluginLoaderTests : IDisposable
     {
         public Task AddAsync(ExecutionRecord execution, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ExecutionRecord?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult<ExecutionRecord?>(null);
+        public Task<IReadOnlyList<ExecutionRecord>> GetByPromptVersionIdAsync(Guid promptVersionId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ExecutionRecord>>([]);
         public Task UpdateAsync(ExecutionRecord execution, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

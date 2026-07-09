@@ -9,6 +9,9 @@ public interface IExecutionRepository
 
     Task<ExecutionRecord?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Every execution of a given prompt version, across every repo (ADR-0005: PromptVersion is not repo-scoped). What <c>IScoringProvider</c> (Phase 8) aggregates over.</summary>
+    Task<IReadOnlyList<ExecutionRecord>> GetByPromptVersionIdAsync(Guid promptVersionId, CancellationToken cancellationToken = default);
+
     /// <summary>Stages changes made to a previously-loaded aggregate. Call <see cref="SaveChangesAsync"/> to commit.</summary>
     Task UpdateAsync(ExecutionRecord execution, CancellationToken cancellationToken = default);
 
