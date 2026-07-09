@@ -90,4 +90,19 @@ public sealed class Prompt
     {
         Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
     }
+
+    /// <summary>Merges the given tags into the prompt's existing metadata, leaving other metadata fields untouched.</summary>
+    public void AddTags(IReadOnlyList<string> tags)
+    {
+        if (tags is null || tags.Count == 0)
+            return;
+
+        var merged = Metadata.Tags
+            .Concat(tags)
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Metadata = Metadata with { Tags = merged };
+    }
 }

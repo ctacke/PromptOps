@@ -118,6 +118,29 @@ public class PromptTests
     }
 
     [Fact]
+    public void AddTags_Merges_New_Tags_And_Deduplicates_Case_Insensitively()
+    {
+        var prompt = Prompt.Create("Fix a bug", new PromptMetadata { Tags = ["bugfix"], Description = "desc" });
+
+        prompt.AddTags(["Backend", "bugfix", "BUGFIX"]);
+
+        Assert.Equal(2, prompt.Metadata.Tags.Count);
+        Assert.Contains(prompt.Metadata.Tags, t => t.Equals("bugfix", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("Backend", prompt.Metadata.Tags);
+        Assert.Equal("desc", prompt.Metadata.Description);
+    }
+
+    [Fact]
+    public void AddTags_With_Empty_List_Is_A_No_Op()
+    {
+        var prompt = Prompt.Create("Fix a bug", new PromptMetadata { Tags = ["bugfix"] });
+
+        prompt.AddTags([]);
+
+        Assert.Single(prompt.Metadata.Tags);
+    }
+
+    [Fact]
     public void UpdateMetadata_Replaces_Metadata_Without_Touching_Versions()
     {
         var prompt = Prompt.Create("Fix a bug");

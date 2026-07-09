@@ -12,5 +12,6 @@
     <Project Path="tests/PromptOps.Architecture.Tests/PromptOps.Architecture.Tests.csproj" />
     <Project Path="tests/PromptOps.Domain.Tests/PromptOps.Domain.Tests.csproj" />
     <Project Path="tests/PromptOps.Host.Tests/PromptOps.Host.Tests.csproj" />
+    <Project Path="tests/PromptOps.Infrastructure.Tests/PromptOps.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

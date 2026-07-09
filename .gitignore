@@ -427,3 +427,8 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# PromptOps local SQLite database (dev/test artifacts, ADR-0005)
+*.db
+*.db-shm
+*.db-wal

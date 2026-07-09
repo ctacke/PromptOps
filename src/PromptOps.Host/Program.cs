@@ -1,11 +1,13 @@
+using Microsoft.EntityFrameworkCore;
 using PromptOps.Application;
 using PromptOps.Infrastructure;
+using PromptOps.Infrastructure.Persistence;
 using PromptOps.Plugin.Sdk;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddPromptOpsApplication();
-builder.Services.AddPromptOpsInfrastructure();
+builder.Services.AddPromptOpsInfrastructure(builder.Configuration);
 
 // Plugin discovery/loading (ADR-0004) is stubbed until Phase 5 — the daemon boots with an
 // empty plugin set today. Once real, this becomes a scan of the configured plugins directory.
@@ -16,6 +18,11 @@ foreach (var plugin in plugins)
 }
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    await scope.ServiceProvider.GetRequiredService<PromptOpsDbContext>().Database.MigrateAsync();
+}
 
 app.MapGet("/health", () => Results.Ok(new HealthResponse("ok", plugins.Count)));
 
