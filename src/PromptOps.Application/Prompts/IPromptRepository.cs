@@ -15,5 +15,8 @@ public interface IPromptRepository
     /// <summary>Metadata-only read — must not load version content.</summary>
     Task<PromptMetadataView?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Every prompt in the shared database, projected for ranking (Phase 9's <c>IRecommendationProvider</c>) — never loads version content.</summary>
+    Task<IReadOnlyList<PromptRecommendationCandidate>> GetRecommendationCandidatesAsync(CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

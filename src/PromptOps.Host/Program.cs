@@ -33,6 +33,7 @@ app.MapMetricsEndpoints();
 app.MapEvaluationEndpoints();
 app.MapAIEvaluationEndpoints();
 app.MapScoringEndpoints();
+app.MapRecommendationEndpoints();
 app.MapMcp("/mcp");
 
 app.Run();

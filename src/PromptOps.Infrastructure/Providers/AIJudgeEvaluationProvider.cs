@@ -13,10 +13,10 @@ namespace PromptOps.Infrastructure.Providers;
 /// to judge it, and parses the response against <see cref="JudgeResponseDto"/>'s schema.
 ///
 /// Resilience (the phase's explicit design requirement) is schema validation + retry, not brittle
-/// string matching: <see cref="ExtractJsonObject"/> tolerates markdown fences or a sentence of
-/// prose around the JSON rather than requiring an exact match, and a response that still doesn't
-/// parse gets one more attempt — with the invalid response and the parse error fed back into the
-/// prompt as a correction — up to <see cref="MaxAttempts"/> times before giving up.
+/// string matching: <see cref="JsonExtraction.ExtractJsonValue"/> tolerates markdown fences or a
+/// sentence of prose around the JSON rather than requiring an exact match, and a response that
+/// still doesn't parse gets one more attempt — with the invalid response and the parse error fed
+/// back into the prompt as a correction — up to <see cref="MaxAttempts"/> times before giving up.
 /// </summary>
 public sealed class AIJudgeEvaluationProvider(
     IAIExecutionProvider aiExecutionProvider,
@@ -116,7 +116,7 @@ public sealed class AIJudgeEvaluationProvider(
         parsed = null;
         error = null;
 
-        var json = ExtractJsonObject(raw);
+        var json = JsonExtraction.ExtractJsonValue(raw);
         if (json is null)
         {
             error = new FormatException("No JSON object found in the response.");
@@ -138,43 +138,5 @@ public sealed class AIJudgeEvaluationProvider(
             error = ex;
             return false;
         }
-    }
-
-    /// <summary>
-    /// Finds the first balanced <c>{...}</c> substring, respecting quoted strings (so a brace
-    /// inside a string value doesn't throw off the depth count) — tolerant of judges that wrap
-    /// JSON in markdown fences or add a sentence of prose before/after.
-    /// </summary>
-    private static string? ExtractJsonObject(string raw)
-    {
-        var start = raw.IndexOf('{');
-        if (start < 0) return null;
-
-        var depth = 0;
-        var inString = false;
-        var escaped = false;
-
-        for (var i = start; i < raw.Length; i++)
-        {
-            var c = raw[i];
-
-            if (inString)
-            {
-                if (escaped) escaped = false;
-                else if (c == '\\') escaped = true;
-                else if (c == '"') inString = false;
-                continue;
-            }
-
-            if (c == '"') inString = true;
-            else if (c == '{') depth++;
-            else if (c == '}')
-            {
-                depth--;
-                if (depth == 0) return raw[start..(i + 1)];
-            }
-        }
-
-        return null;
     }
 }

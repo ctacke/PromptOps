@@ -34,6 +34,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAIExecutionProvider, ManualAIExecutionProvider>();
         services.AddScoped<IAIEvaluationProvider, AIJudgeEvaluationProvider>();
         services.AddScoped<IScoringProvider, WeightedSumScoringProvider>();
+        services.AddScoped<IActivityClassifier, AIActivityClassifier>();
+        services.AddScoped<IRecommendationProvider, TagAndHistoryRecommendationProvider>();
         services.AddSingleton<ISecretProvider, EnvironmentSecretProvider>();
 
         // Recompute-on-event (debounced, Phase 8): one singleton scheduler, four domain event

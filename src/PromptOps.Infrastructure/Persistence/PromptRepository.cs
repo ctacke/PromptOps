@@ -76,6 +76,41 @@ public sealed class PromptRepository(PromptOpsDbContext db) : IPromptRepository
         return new PromptMetadataView(projection.Id, projection.Name, metadata);
     }
 
+    public async Task<IReadOnlyList<PromptRecommendationCandidate>> GetRecommendationCandidatesAsync(CancellationToken cancellationToken = default)
+    {
+        // Deliberately projects only version identity (id/number/status), never Content — same
+        // "must not load version content" discipline as GetMetadataAsync, just across every prompt
+        // instead of one. In-memory scan over tags (a JSON column, not SQL-filterable — see
+        // docs/recommendations.md) is fine at this project's stated single-machine scale.
+        var prompts = await db.Prompts
+            .AsNoTracking()
+            .Select(p => new
+            {
+                p.Id,
+                p.Name,
+                Tags = p.Metadata.Tags,
+                Versions = p.Versions.Select(v => new { v.Id, v.VersionNumber, v.Status }).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        var candidates = new List<PromptRecommendationCandidate>();
+        foreach (var prompt in prompts)
+        {
+            if (prompt.Versions.Count == 0)
+                continue;
+
+            var best = prompt.Versions
+                .Where(v => v.Status == nameof(PromptVersionStatus.Active))
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault()
+                ?? prompt.Versions.OrderByDescending(v => v.VersionNumber).First();
+
+            candidates.Add(new PromptRecommendationCandidate(prompt.Id, prompt.Name, prompt.Tags, best.Id, best.VersionNumber));
+        }
+
+        return candidates;
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => db.SaveChangesAsync(cancellationToken);
 
