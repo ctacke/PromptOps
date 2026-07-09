@@ -13,13 +13,28 @@ COPY src/PromptOps.Application/PromptOps.Application.csproj src/PromptOps.Applic
 COPY src/PromptOps.Infrastructure/PromptOps.Infrastructure.csproj src/PromptOps.Infrastructure/
 COPY src/PromptOps.Host/PromptOps.Host.csproj src/PromptOps.Host/
 COPY plugins/PromptOps.Plugin.Sdk/PromptOps.Plugin.Sdk.csproj plugins/PromptOps.Plugin.Sdk/
-RUN dotnet restore src/PromptOps.Host/PromptOps.Host.csproj
+COPY plugins/PromptOps.Plugins.Sonar/PromptOps.Plugins.Sonar.csproj plugins/PromptOps.Plugins.Sonar/
+COPY plugins/PromptOps.Plugins.BuildResult/PromptOps.Plugins.BuildResult.csproj plugins/PromptOps.Plugins.BuildResult/
+RUN dotnet restore src/PromptOps.Host/PromptOps.Host.csproj \
+    && dotnet restore plugins/PromptOps.Plugins.Sonar/PromptOps.Plugins.Sonar.csproj \
+    && dotnet restore plugins/PromptOps.Plugins.BuildResult/PromptOps.Plugins.BuildResult.csproj
 
 COPY src/ src/
 COPY plugins/ plugins/
 RUN dotnet publish src/PromptOps.Host/PromptOps.Host.csproj \
     -c Release \
     -o /app \
+    --no-restore
+
+# Daemon-side provider plugins (ADR-0004) — each published into its own subdirectory under
+# /app/plugins/<ProjectName>, the convention PluginLoader expects (docs/plugin-authoring.md).
+RUN dotnet publish plugins/PromptOps.Plugins.Sonar/PromptOps.Plugins.Sonar.csproj \
+    -c Release \
+    -o /app/plugins/PromptOps.Plugins.Sonar \
+    --no-restore \
+    && dotnet publish plugins/PromptOps.Plugins.BuildResult/PromptOps.Plugins.BuildResult.csproj \
+    -c Release \
+    -o /app/plugins/PromptOps.Plugins.BuildResult \
     --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

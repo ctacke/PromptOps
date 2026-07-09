@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/plugins/">
     <Project Path="plugins/PromptOps.Plugin.Sdk/PromptOps.Plugin.Sdk.csproj" />
+    <Project Path="plugins/PromptOps.Plugins.Sonar/PromptOps.Plugins.Sonar.csproj" />
+    <Project Path="plugins/PromptOps.Plugins.BuildResult/PromptOps.Plugins.BuildResult.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/PromptOps.Application/PromptOps.Application.csproj" />
@@ -13,5 +15,6 @@
     <Project Path="tests/PromptOps.Domain.Tests/PromptOps.Domain.Tests.csproj" />
     <Project Path="tests/PromptOps.Host.Tests/PromptOps.Host.Tests.csproj" />
     <Project Path="tests/PromptOps.Infrastructure.Tests/PromptOps.Infrastructure.Tests.csproj" />
+    <Project Path="tests/PromptOps.Plugins.Tests/PromptOps.Plugins.Tests.csproj" />
   </Folder>
 </Solution>

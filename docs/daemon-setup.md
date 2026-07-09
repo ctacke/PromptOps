@@ -16,7 +16,7 @@ Check it's up:
 curl http://127.0.0.1:5179/health
 ```
 
-(or open that URL in a browser — the response is a small JSON object, `{"status":"ok","pluginsLoaded":0}`).
+(or open that URL in a browser — the response is a small JSON object, `{"status":"ok","pluginsLoaded":2}` — the `sonar` and `build-result` metric-collector plugins load by default, see below).
 
 ## Where data lives
 
@@ -46,6 +46,18 @@ Per ADR-0007, the daemon must never be reachable from outside the host machine. 
   ```
 
   Today it exposes two tools — `health_check` and `version` — enough to prove connectivity. Real tools (search history, get a recommendation, submit a rating) land as the use cases behind them are built in later phases.
+
+## Metric-collector plugins
+
+The image ships with two daemon-side plugins (ADR-0004) already built in: `sonar` and `build-result` (Phase 5, see `docs/metrics.md` and `docs/plugin-authoring.md`). Both load automatically — `pluginsLoaded` in `/health` reflects this — but `sonar` does nothing until it's configured, since not every daemon has a Sonar server to talk to. Set these on the host shell before `docker compose up` to point it at a real server:
+
+```
+$env:PROMPTOPS_SONAR_BASE_URL = "https://sonar.example.com"
+$env:PROMPTOPS_SONAR_TOKEN = "..."
+docker compose up -d
+```
+
+`docker-compose.yml` passes these through as `Plugins__sonar__BaseUrl` and `PROMPTOPS_SECRET_SONAR_TOKEN` — the token specifically goes through `ISecretProvider`, never plain configuration (ADR-0007). `build-result` needs no configuration; it only acts on content pushed to it per call.
 
 ## Upgrading the image
 

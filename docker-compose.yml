@@ -13,6 +13,12 @@ services:
       - "127.0.0.1:5179:8080"
     volumes:
       - promptops-data:/data
+    environment:
+      # Unset by default — Sonar collection is skipped (not an error) until a daemon operator
+      # configures these (docs/metrics.md). Set on the host shell before `docker compose up` to
+      # point at a real (or, for scripts/metrics-smoke-test.ps1, fake) Sonar server.
+      - Plugins__sonar__BaseUrl=${PROMPTOPS_SONAR_BASE_URL:-}
+      - PROMPTOPS_SECRET_SONAR_TOKEN=${PROMPTOPS_SONAR_TOKEN:-}
 
 volumes:
   promptops-data:

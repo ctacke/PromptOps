@@ -1,10 +1,10 @@
 # Plugin Authoring
 
-This doc covers writing PromptOps provider plugins. It's still a stub for that subject until Phase 5 fills it in with a worked example (`SonarMetricCollector`); the hook contract for the separate, per-repo Claude Code plugin (Phase 4b) is filled in below. For now, here's the distinction that matters:
+This doc covers writing PromptOps provider plugins, with `SonarMetricCollector` (Phase 5) as the worked example. The hook contract for the separate, per-repo Claude Code plugin (Phase 4b) is further below. Here's the distinction that matters:
 
 ## Two different things are called "plugin" in this project — don't confuse them
 
-1. **Daemon-side provider plugins** (this doc's actual subject). A separate .NET assembly that implements `IPromptOpsPlugin` (defined in `plugins/PromptOps.Plugin.Sdk`) and registers one or more of the provider interfaces from ADR-0003 (`IMetricCollector`, `IContextProvider`, `IAIExecutionProvider`, etc.) into the daemon's DI container. This is how PromptOps integrates with Sonar, Jira, GitHub, Claude Code, and so on, without the core (`Domain`/`Application`) ever knowing those tools exist (ADR-0002). Loaded from the daemon's plugins directory — real discovery/loading lands in Phase 5 (ADR-0004); it's a hardcoded empty list today.
+1. **Daemon-side provider plugins** (this doc's actual subject). A separate .NET assembly that implements `IPromptOpsPlugin` (defined in `plugins/PromptOps.Plugin.Sdk`) and registers one or more of the provider interfaces from ADR-0003 (`IMetricCollector`, `IContextProvider`, `IAIExecutionProvider`, etc.) into the daemon's DI container. This is how PromptOps integrates with Sonar, Jira, GitHub, Claude Code, and so on, without the core (`Domain`/`Application`) ever knowing those tools exist (ADR-0002). Discovery/loading (ADR-0004) is real as of Phase 5 — see below.
 
 2. **The per-repo Claude Code plugin** (a different artifact entirely — see ADR-0009). This is what actually gets installed into a target repository: a `.claude-plugin/plugin.json` manifest, Node.js hook scripts, and skills, with no compiled/.NET code of its own. It talks to the daemon over `localhost`. Lives in `claude-plugin/` at the repo root. Built in Phase 4b.
 
@@ -21,7 +21,50 @@ public interface IPromptOpsPlugin
 }
 ```
 
-`Register` is where a plugin adds its provider implementations (e.g. `services.AddSingleton<IMetricCollector, SonarMetricCollector>()`) using whatever configuration section the daemon hands it. There's nothing to build against yet beyond this interface — the provider interfaces themselves (`docs/architecture.md` ADR-0003) are still empty contracts, filled in phase by phase as the use cases that need them are built.
+`Register` is where a plugin adds its provider implementations using whatever configuration section the daemon hands it.
+
+## Worked example: `SonarMetricCollector` (Phase 5)
+
+A minimal, complete daemon-side plugin, in `plugins/PromptOps.Plugins.Sonar/`:
+
+```
+plugins/PromptOps.Plugins.Sonar/
+├── PromptOps.Plugins.Sonar.csproj   references PromptOps.Application + PromptOps.Plugin.Sdk only
+├── SonarPlugin.cs                   IPromptOpsPlugin — the Register() entry point
+├── SonarMetricCollector.cs          IMetricCollector — the actual work
+├── SonarOptions.cs                  bound from configuration
+└── SonarMeasuresResponse.cs         DTOs for Sonar's measures API response
+```
+
+```csharp
+// SonarPlugin.cs
+public sealed class SonarPlugin : IPromptOpsPlugin
+{
+    public string Name => "sonar";
+    public string Version => "0.5.0";
+
+    public void Register(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<SonarOptions>(configuration);
+        services.AddHttpClient<SonarMetricCollector>();
+        services.AddScoped<IMetricCollector>(sp => sp.GetRequiredService<SonarMetricCollector>());
+    }
+}
+```
+
+`configuration` here is already scoped to `Plugins:sonar` by `PluginLoader` (see below) — the plugin never needs to know its own name is baked into a config path. `SonarMetricCollector` itself takes `HttpClient`, `IExecutionRepository` (to resolve the execution's `Context.Repository` into a Sonar project key), `ISecretProvider` (to resolve the auth token — never from plain config, ADR-0007), and `IOptions<SonarOptions>` — all constructor-injected, all from `Application`, nothing from `Infrastructure`. See `docs/metrics.md` for what it actually does with them.
+
+Following this pattern for a new collector — say, a review-metrics plugin reading GitHub PR data — means: a new project under `plugins/`, an `IPromptOpsPlugin` + `IMetricCollector` pair, a `ProjectReference` to `PromptOps.Application` and `PromptOps.Plugin.Sdk`, and one new line in the Dockerfile's publish step (below). Nothing in `Domain`, `Application`, `Host`, or any *other* plugin changes.
+
+## Plugin discovery and loading (ADR-0004)
+
+`PromptOps.Host.Plugins.PluginLoader.LoadAndRegister` scans `Plugins:Directory` (default: `plugins/` next to the daemon's own binaries — `/app/plugins` in the Docker image) for subdirectories. For each one, it expects the primary DLL at `{pluginsDirectory}/{FolderName}/{FolderName}.dll` — convention over a separate manifest file, since the folder layout already says everything a manifest would. That's exactly what `dotnet publish -o /app/plugins/PromptOps.Plugins.Sonar` produces, which is what the Dockerfile does for each in-tree plugin project.
+
+Each plugin's DLL is loaded into its **own** `AssemblyLoadContext` (`PluginLoadContext`) — a broken or incompatible plugin can't take down the daemon process. This isolation has one real trap, worth understanding before writing a new plugin that references anything beyond `PromptOps.Application`/`PromptOps.Plugin.Sdk`:
+
+> **The type-identity trap.** `IPromptOpsPlugin.Register`'s signature is `(IServiceCollection, IConfiguration)`. If a plugin's isolated `AssemblyLoadContext` loads its *own* copy of `Microsoft.Extensions.DependencyInjection.Abstractions` (a plain NuGet package, not part of the ASP.NET Core shared framework — so nothing stops it being loaded twice) instead of reusing the daemon's own copy, the plugin's `IServiceCollection` parameter type is no longer *the same type* as the host's, even though it has the same name. The CLR can't build the plugin type's method table and throws a `TypeLoadException` reading "Method 'Register' does not have an implementation" — a confusing message, since the method is right there in source; the type it takes just doesn't match across the two copies of the assembly that declares it. `PluginLoadContext.Load` avoids this by explicitly handing back the exact `Assembly` instance already loaded in `AssemblyLoadContext.Default` for `PromptOps.Domain`/`PromptOps.Application`/`PromptOps.Plugin.Sdk` and everything under `Microsoft.Extensions.*`/`Microsoft.AspNetCore*`/`System.*` — sharing identity, not just resolving a same-named assembly. Only a plugin's genuinely private dependencies (resolved via `AssemblyDependencyResolver`, reading the plugin's own `.deps.json`) get loaded in isolation. If you add a plugin with a private third-party dependency and hit this exact exception, it means that dependency's own transitive references pulled in something that should have been on the shared list.
+
+Adding or removing a plugin is a **config change**: drop a new `{Name}/{Name}.dll` folder under the plugins directory (or delete one) and restart the daemon. `MetricsCollectionService` and the ingestion endpoints never change — they resolve `IEnumerable<IMetricCollector>` from DI and iterate whatever's there.
 
 ## The Claude Code plugin's hook contract (Phase 4b)
 

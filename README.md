@@ -34,7 +34,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full architecture and
 
 ## Status
 
-Phase 0 (architecture decision + project plan), Phase 1 (domain core + solution skeleton), Phase 2 (prompt repository — EF Core/SQLite persistence, see [`docs/prompt-repository.md`](docs/prompt-repository.md)), Phase 3 (execution tracking — see [`docs/execution-tracking.md`](docs/execution-tracking.md)), Phase 4a (Docker daemon packaging + MCP-over-HTTP — see [`docs/daemon-setup.md`](docs/daemon-setup.md)), and Phase 4b (the per-repo Claude Code plugin — see [`docs/installing-promptops.md`](docs/installing-promptops.md)) are complete. Each subsequent phase ships working software and is reviewed before the next begins — see [`docs/project-plan.md`](docs/project-plan.md) for the current phase breakdown.
+Phase 0 (architecture decision + project plan), Phase 1 (domain core + solution skeleton), Phase 2 (prompt repository — EF Core/SQLite persistence, see [`docs/prompt-repository.md`](docs/prompt-repository.md)), Phase 3 (execution tracking — see [`docs/execution-tracking.md`](docs/execution-tracking.md)), Phase 4a (Docker daemon packaging + MCP-over-HTTP — see [`docs/daemon-setup.md`](docs/daemon-setup.md)), Phase 4b (the per-repo Claude Code plugin — see [`docs/installing-promptops.md`](docs/installing-promptops.md)), and Phase 5 (engineering metric collectors — Sonar + build/test results, real plugin loading — see [`docs/metrics.md`](docs/metrics.md)) are complete. Each subsequent phase ships working software and is reviewed before the next begins — see [`docs/project-plan.md`](docs/project-plan.md) for the current phase breakdown.
 
 ## Solution layout
 
@@ -46,11 +46,15 @@ src/
   PromptOps.Infrastructure  default implementations of Application's ports (EF Core/SQLite, etc.)
   PromptOps.Host            the daemon's composition root and entry point (ADR-0009)
 plugins/
-  PromptOps.Plugin.Sdk      IPromptOpsPlugin — the contract daemon-side provider plugins implement
+  PromptOps.Plugin.Sdk         IPromptOpsPlugin — the contract daemon-side provider plugins implement
+  PromptOps.Plugins.Sonar      IMetricCollector querying SonarQube/SonarCloud (Phase 5)
+  PromptOps.Plugins.BuildResult IMetricCollector parsing pushed trx/Cobertura content (Phase 5)
 tests/
-  PromptOps.Domain.Tests        unit tests for Domain
-  PromptOps.Architecture.Tests  NetArchTest fitness tests enforcing the layering rule above
-  PromptOps.Host.Tests          integration tests against the Host (WebApplicationFactory)
+  PromptOps.Domain.Tests         unit tests for Domain
+  PromptOps.Architecture.Tests   NetArchTest fitness tests enforcing the layering rule above
+  PromptOps.Infrastructure.Tests integration tests against real SQLite (SqliteFixture)
+  PromptOps.Plugins.Tests        unit tests for the Sonar/BuildResult collectors
+  PromptOps.Host.Tests           integration tests against the Host (WebApplicationFactory) + plugin loading
 ```
 
 Dependencies point inward only: `Domain` ← `Application` ← `Infrastructure`/`Host`. `PromptOps.Architecture.Tests` fails the build if that's ever violated — see [`docs/architecture.md`](docs/architecture.md) ADR-0002.
