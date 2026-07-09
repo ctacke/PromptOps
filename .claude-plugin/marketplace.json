@@ -1,0 +1,23 @@
+{
+  "name": "promptops",
+  "owner": {
+    "name": "Chris Tacke"
+  },
+  "metadata": {
+    "description": "PromptOps — prompt versioning, evaluation, and continuous improvement for AI-assisted development.",
+    "version": "0.4.0"
+  },
+  "plugins": [
+    {
+      "name": "promptops",
+      "source": "./claude-plugin",
+      "description": "Per-repo Claude Code plugin (ADR-0009): hooks that capture execution context and talk to the local PromptOps daemon, plus /promptops rate|recommend|history skills.",
+      "version": "0.4.0",
+      "author": {
+        "name": "Chris Tacke"
+      },
+      "category": "development",
+      "keywords": ["promptops", "prompt-engineering", "telemetry", "mcp"]
+    }
+  ]
+}

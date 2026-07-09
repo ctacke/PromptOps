@@ -1,0 +1,15 @@
+{
+  "name": "promptops",
+  "displayName": "PromptOps",
+  "description": "Prompt versioning, execution tracking, and evaluation for AI-assisted development. Talks to a local PromptOps daemon over localhost — nothing leaves your machine.",
+  "version": "0.4.0",
+  "author": {
+    "name": "Chris Tacke"
+  },
+  "homepage": "https://github.com/ctacke/PromptOps",
+  "repository": "https://github.com/ctacke/PromptOps",
+  "license": "MIT",
+  "keywords": ["promptops", "prompt-engineering", "telemetry", "mcp"],
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
+}
