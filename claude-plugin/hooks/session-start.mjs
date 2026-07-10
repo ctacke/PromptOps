@@ -29,7 +29,7 @@ if (!health || !health.ok) {
     additionalContext:
       "The PromptOps daemon is not reachable at " + daemonUrl() + ". Execution tracking for this " +
       "session is disabled until it's running. Offer to start it: use the promptops setup skill, " +
-      "or (if this is the PromptOps source repo) run `docker compose up -d --build`. " +
+      "or run `docker run -d --name promptops-daemon -p 127.0.0.1:5179:8080 -v promptops-data:/data ghcr.io/ctacke/promptops:latest`. " +
       "See docs/daemon-setup.md / docs/installing-promptops.md."
   });
   process.exit(0);

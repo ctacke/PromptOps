@@ -12,10 +12,10 @@ If you want the full picture of what's actually happening at each step, `docs/pr
 
 ## 1. Start the daemon
 
-From a checkout of the PromptOps source repo itself (not your project):
+Run the daemon from the published package in GitHub Container Registry (GHCR):
 
 ```powershell
-docker compose up -d --build
+docker run -d --name promptops-daemon --restart unless-stopped -p 127.0.0.1:5179:8080 -v promptops-data:/data ghcr.io/ctacke/promptops:latest
 ```
 
 Confirm it's up:
@@ -25,7 +25,7 @@ Invoke-RestMethod http://127.0.0.1:5179/health
 # {"status":"ok","pluginsLoaded":2}
 ```
 
-The daemon binds to `127.0.0.1` only — it's never reachable from outside this machine (ADR-0007). Its SQLite database lives in a named Docker volume (`promptops-data`) that survives restarts and rebuilds. Full details, backup/restore, and the `sonar`/`build-result` metric plugins: `docs/daemon-setup.md`.
+The daemon binds to `127.0.0.1` only — it's never reachable from outside this machine (ADR-0007). Its SQLite database lives in a named Docker volume (`promptops-data`) that survives restarts. Full details, backup/restore, and configuring the `sonar`/`build-result` metric plugins: [daemon-setup.md](file:///F:/repos/ctacke/PromptOps/docs/daemon-setup.md).
 
 If you'd rather have Claude Code do this step for you inside a session, `/promptops setup` walks through the same thing.
 

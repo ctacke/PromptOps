@@ -4,11 +4,19 @@ The daemon (ADR-0009) is a single Docker image, started once per developer machi
 
 ## Starting the daemon
 
+To run the daemon from the published package in GitHub Container Registry (GHCR):
+
+```
+docker run -d --name promptops-daemon --restart unless-stopped -p 127.0.0.1:5179:8080 -v promptops-data:/data ghcr.io/ctacke/promptops:latest
+```
+
+If you are developing/contributing to PromptOps and want to build the daemon from source instead:
+
 ```
 docker compose up -d --build
 ```
 
-This builds the image from the repo-root `Dockerfile` and starts it per `docker-compose.yml`. First build pulls the .NET 10 SDK/ASP.NET base images; subsequent builds reuse Docker's layer cache and are fast unless a `.csproj` changed.
+This builds the image from the repo-root `Dockerfile` and starts it per `docker-compose.yml`.
 
 Check it's up:
 
@@ -55,14 +63,23 @@ docker compose up -d
 
 ## Upgrading the image
 
-Pull the latest source, then rebuild and recreate the container. The named volume is untouched by this — your data survives:
+If you are running the pre-built GHCR image, pull the latest image and restart the container:
+
+```powershell
+docker pull ghcr.io/ctacke/promptops:latest
+docker stop promptops-daemon
+docker rm promptops-daemon
+docker run -d --name promptops-daemon --restart unless-stopped -p 127.0.0.1:5179:8080 -v promptops-data:/data ghcr.io/ctacke/promptops:latest
+```
+
+If you built from source, pull the latest source, then rebuild and recreate the container:
 
 ```
 git pull
 docker compose up -d --build
 ```
 
-Pending EF Core migrations run automatically at startup (`Program.cs` calls `Database.MigrateAsync()` before the app starts serving requests).
+The named volume is untouched by this — your data survives. Pending EF Core migrations run automatically at startup (`Program.cs` calls `Database.MigrateAsync()` before the app starts serving requests).
 
 ## Stopping the daemon
 
