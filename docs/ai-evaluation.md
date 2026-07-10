@@ -138,7 +138,7 @@ Client (Claude Code, or any MCP client)          Daemon
 
 ### What doesn't change
 
-`AutoAIEvaluationTrigger` (automatic evaluation on execution finish, docs/ai-evaluation.md above) runs in a detached background task with no live client attached — there is nothing to delegate *to* at that point. Automatic/unattended evaluation keeps using a daemon-owned `IAIExecutionProvider` (`AIExecution:Provider` config, ADR-0003): `manual` for tests, `claude-cli` (or a future direct-API provider) for real unattended runs. Client delegation is additive for the interactive case, not a replacement for the autonomous one.
+`AutoAIEvaluationTrigger` (automatic evaluation on execution finish, docs/ai-evaluation.md above) runs in a detached background task with no live client attached — there is nothing to delegate *to* at that point. As of Phase 12, automatic/unattended evaluation keeps using a daemon-owned `IAIExecutionProvider` (`AIExecution:Provider` config, ADR-0003): `manual` for tests, `claude-cli` (or a future direct-API provider) for real unattended runs. Client delegation is additive for the interactive case, not a replacement for the autonomous one. **Phase 13 (below) adds a third option** — delegating automatic evaluation from the client-side `SessionEnd` hook instead of the daemon — for teams that want unattended evaluation without giving the daemon its own AI credentials at all.
 
 ### Testing (implemented)
 
@@ -149,3 +149,81 @@ All in `PromptOps.Infrastructure.Tests` (no dedicated `PromptOps.Application.Tes
 - `InMemoryPendingDelegatedEvaluationStoreTests` — create/get round-trip, unknown-id lookup, TTL eviction (via a manual `TimeProvider`, permanent once evicted), update refreshes prompt/attempt/expiry, remove.
 
 Not yet added: a Host-level MCP end-to-end test for `prepare_ai_evaluation`/`submit_ai_evaluation_result` — no existing test exercises an MCP tool class directly today (`AIEvaluationTools` itself isn't tested either; only the services/endpoints underneath it are), so `DelegatedAIEvaluationTools`' thin pass-through follows that same convention rather than introducing a new one.
+
+## Client-Side Automatic Evaluation (ADR-0010 amendment, Phase 13) — design
+
+**Not yet implemented — design only.**
+
+`AutoAIEvaluationTrigger` needs a daemon-owned `IAIExecutionProvider` because it fires from a detached background task (`ExecutionRecorded`, raised once from `ExecutionRecord.Finish()`) with no live MCP client attached to delegate to via `prepare_ai_evaluation`/`submit_ai_evaluation_result`. Getting automatic evaluation *without* the daemon owning credentials means moving the delegation to a place that both (a) reliably runs once per session and (b) has access to an already-authenticated AI client. The per-repo plugin's `SessionEnd` hook (`claude-plugin/hooks/session-end.mjs`) is exactly that place: it's a plain Node.js script running natively on the developer's machine — not inside the daemon's container — where `claude` (the CLI) is already installed and already logged in, for the sole reason that Claude Code itself needs it to be. It's also already the hook that calls `POST /executions/{id}/finish` (see `session-end.mjs`'s own comment on why `SessionEnd`, not `Stop`, is used — `Stop` fires once per conversational turn, `SessionEnd` fires once per session, matching `ExecutionRecord`'s single `InProgress → Finished` transition).
+
+### Why not reuse the MCP tools directly
+
+`prepare_ai_evaluation`/`submit_ai_evaluation_result` (Phase 12) are MCP tools — hooks are not MCP clients, they're scripts that `fetch()` the daemon's loopback ingestion API (ADR-0006). Reaching `DelegatedAIEvaluationService` from a hook needs two new **ingestion HTTP endpoints** that are thin wrappers around the exact same service, mirroring the existing `POST/GET /executions/{id}/ai-evaluations` pair:
+
+```
+POST /executions/{id}/ai-evaluations/prepare
+  → 200 OK { "correlationId": "...", "prompt": "..." }
+  → 404 if the execution doesn't exist
+
+POST /executions/{id}/ai-evaluations/submit
+  { "correlationId": "...", "response": "..." }
+  → 200 OK { "status": "recorded", ...evaluation } | { "status": "retry_needed", "correlationId", "prompt" }
+  → 404 if the correlation id is unknown/expired
+  → 502 if attempts are exhausted without a valid response
+```
+
+No change to `DelegatedAIEvaluationService` itself — same as the MCP tools, these endpoints just call `PrepareAsync`/`SubmitAsync`.
+
+### Policy: a mechanism, not just an on/off switch
+
+`AIEvaluationPolicy` today is a single bool (`AutoEvaluateOnFinish`). Phase 13 needs to know not just *whether* automatic evaluation should happen but *which* of two mechanisms should do it — the daemon (`AutoAIEvaluationTrigger`, existing) or the client hook (new) — otherwise turning both on would evaluate every execution twice (harmless since `AIEvaluation` rows are additive, but wasteful, and confusing about which `judgeProviderId` "the" automatic evaluation came from). Add a second field:
+
+```csharp
+public enum AutoEvaluationMechanism { Daemon, ClientHook }
+
+public sealed class AIEvaluationPolicy
+{
+    public bool AutoEvaluateOnFinish { get; private set; }
+    public AutoEvaluationMechanism Mechanism { get; private set; } = AutoEvaluationMechanism.Daemon; // back-compat default
+    // ...
+}
+```
+
+`GET/PUT /ai-evaluation-policy` (and `get_ai_evaluation_policy`/`update_ai_evaluation_policy`) gain an optional `mechanism` field, defaulting to `Daemon` when omitted — every existing installation/test that only ever set `autoEvaluateOnFinish` keeps behaving exactly as it does today. `AutoAIEvaluationTrigger` adds one more guard: only fires when `AutoEvaluateOnFinish && Mechanism == Daemon`. When `Mechanism == ClientHook`, the daemon does nothing automatically — the hook is entirely responsible.
+
+### `session-end.mjs` changes
+
+After the existing `finish` call (unchanged), and only when the daemon's policy says `AutoEvaluateOnFinish && Mechanism == ClientHook`:
+
+```
+SessionEnd (session-end.mjs)
+  │
+  ├─ POST .../finish (existing, unchanged, best-effort/4s timeout)
+  │
+  ├─ GET /ai-evaluation-policy ──▶ { autoEvaluateOnFinish: true, mechanism: "clientHook" }
+  │
+  ├─ spawn detached child process (auto-evaluate.mjs), stdio ignored, unref'd,
+  │  THEN session-end.mjs exits immediately — does not wait for the child
+  │
+  ┊  (independently, in the detached child:)
+  ┊  POST .../ai-evaluations/prepare ──▶ { correlationId, prompt }
+  ┊  spawn `claude -p --output-format text`, write `prompt` to stdin, read stdout
+  ┊  POST .../ai-evaluations/submit { correlationId, response: <stdout> }
+  ┊    "retry_needed" → re-run `claude -p` with the corrected prompt, up to MaxAttempts
+  ┊    "recorded" or exhausted-attempts error → log locally, exit
+```
+
+The detach is the important part: `session-end.mjs`'s own doc comment already establishes "SessionEnd hooks can't block session termination anyway" for the fast `finish` call — spawning a whole `claude -p` round trip (which can take many seconds) inline would either hang session termination or race Node's process exit. A separate, detached (`{ detached: true, stdio: "ignore" }`, `.unref()`) child process lets `session-end.mjs` return immediately while the evaluation runs independently in the background, matching `AutoAIEvaluationTrigger`'s own existing discipline: "a failed background evaluation is logged, never propagated."
+
+### What this does and doesn't solve
+
+- **Does:** genuine unattended/automatic evaluation with zero AI credentials in the daemon or its container — the daemon never touches a model, same as the interactive delegated path, just triggered by the hook instead of a human typing `/promptops evaluate`.
+- **Doesn't:** eliminate the cost/latency of a real judge call on every session end — this is still a real `claude -p` invocation, so it must stay opt-in (`Mechanism == ClientHook` is never the silent default), same reasoning `AutoEvaluateOnFinish` itself already has.
+- **Doesn't stay provider-agnostic at the hook layer** — unlike the daemon's `prepare`/`submit` endpoints (which don't know or care what answered them), `session-end.mjs` is Claude-Code-specific by construction (it's *this* plugin's hook). A different MCP client wanting the same automatic behavior would need its own equivalent hook/extension shelling out to *its own* CLI — the daemon-side contract stays identical either way, so this doesn't reintroduce a Claude-specific assumption into the daemon itself, only into this one plugin's implementation of automatic evaluation.
+
+### Testing (planned)
+
+- `AIEvaluationPolicyTests` (Domain) — extend for the new `Mechanism` field: defaults to `Daemon`, round-trips through `Update`.
+- `AutoAIEvaluationTriggerTests` (Infrastructure) — extend: `Mechanism == ClientHook` means the trigger does not fire even when `AutoEvaluateOnFinish` is true.
+- New Host endpoint tests (matching `AIEvaluationEndpointsTests`' style) for `POST .../ai-evaluations/prepare` and `POST .../ai-evaluations/submit`: 200/404/502 cases, mirroring the MCP tool behavior already covered by `DelegatedAIEvaluationServiceTests`.
+- Hook-level test: a scripted smoke test (matching Phase 4b's "install the plugin in a scratch repo, run a session, inspect what landed in the daemon" style) — set the policy to `ClientHook`, run a session with `claude` available locally, end it, and verify (a) the terminal/session isn't blocked waiting on the hook, (b) an `AIEvaluation` with `judgeProviderId: "client-delegated"` eventually appears for the execution.

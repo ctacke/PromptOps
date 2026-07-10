@@ -198,7 +198,26 @@ Two artifacts run through every phase from Phase 4 onward: the **daemon** (Docke
 
 **Docs:** `docs/ai-evaluation.md` (already updated with the design above), ADR-0010 in `docs/architecture.md` (already recorded).
 
-## Phase 13+ (each re-planned in detail when reached)
+## Phase 13 — Client-Side Automatic Evaluation (SessionEnd Hook Delegation)
+
+**Context:** Phase 12's client-delegated evaluation only works interactively — `prepare_ai_evaluation` needs a live, mid-conversation agent turn to answer it, and `AutoAIEvaluationTrigger` (automatic evaluation on execution finish) fires from a detached background task with no such conversation attached. Today that means automatic/unattended evaluation still requires a daemon-owned `IAIExecutionProvider` (credentials/CLI living in the daemon or its container). This phase closes that gap the same way Phase 12 closed the interactive one — by delegating to something that already has an authenticated AI client — except the delegating party is the per-repo plugin's `SessionEnd` hook (`claude-plugin/hooks/session-end.mjs`, a local Node.js script) rather than a live agent turn. Full design: `docs/ai-evaluation.md` §"Client-Side Automatic Evaluation"; decision record: ADR-0010 amendment.
+
+**Deliverables**
+- Two new ingestion HTTP endpoints, thin wrappers around the existing `DelegatedAIEvaluationService` (Phase 12): `POST /executions/{id}/ai-evaluations/prepare`, `POST /executions/{id}/ai-evaluations/submit`.
+- `AIEvaluationPolicy` extended with an `AutoEvaluationMechanism` (`Daemon` | `ClientHook`) field, defaulting to `Daemon` for backward compatibility. `AutoAIEvaluationTrigger` gains a guard so it never fires when the mechanism is `ClientHook`.
+- `session-end.mjs` updated to check the policy after its existing `finish` call and, when `AutoEvaluateOnFinish && Mechanism == ClientHook`, spawn a **detached** child process that calls `prepare`, shells out to `claude -p` locally (reusing the developer's own already-authenticated CLI — zero daemon/container changes), and calls `submit`, looping on `retry_needed` up to `JudgePromptBuilder.MaxAttempts`.
+
+**Acceptance criteria**
+- With the policy set to `ClientHook`, ending a session with no other manual action produces a persisted `AIEvaluation` (`judgeProviderId: "client-delegated"`) for that execution, without any AI credentials configured on the daemon.
+- `session-end.mjs`'s own exit is not delayed by the evaluation subprocess — the detached child runs independently.
+- With the policy set to `Daemon` (the default), behavior is unchanged from Phase 8-11: `AutoAIEvaluationTrigger` fires exactly as it does today, and `session-end.mjs` does nothing extra.
+- A failed/unavailable `claude` CLI on the developer's machine degrades to "no automatic evaluation happened," logged locally, never blocking or erroring the session.
+
+**Testing:** `AIEvaluationPolicyTests` (Domain) extended for the new field; `AutoAIEvaluationTriggerTests` (Infrastructure) extended for the `ClientHook` no-op guard; new Host endpoint tests for the two ingestion endpoints (200/404/502, matching `AIEvaluationEndpointsTests`' style); a scripted hook-level smoke test in a scratch repo (matching Phase 4b's testing style) proving the end-to-end unattended flow and the non-blocking exit.
+
+**Docs:** `docs/ai-evaluation.md` (already updated with the design above), ADR-0010 amendment in `docs/architecture.md` (already recorded).
+
+## Phase 14+ (each re-planned in detail when reached)
 
 - Additional daemon-side context/metric plugins: Jira, GitHub, Azure DevOps, ADR/spec document providers (network-reachable ones only — filesystem-bound sources stay hook-pushed per ADR-0005/Phase 3).
 - Observability: OpenTelemetry tracing/metrics across execution time, failure rates, scoring trends, recommendation accuracy, all queryable per-repo or across the whole daemon.

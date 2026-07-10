@@ -1,6 +1,6 @@
 # Getting Started
 
-You have an existing project and want PromptOps tracking your Claude Code sessions in it, scoring the results, and recommending a better starting prompt next time. This is the shortest path from zero to that, in order.
+You have an existing project and want PromptOps tracking your Claude Code sessions in it, scoring the results, and recommending a better starting prompt next time. This is the shortest path from zero to that, in order — laid out as the loop you'll actually live in day to day, not just a feature checklist.
 
 If you want the full picture of what's actually happening at each step, `docs/promptops-flow.html` is a visual walkthrough; this doc is the practical "do this" version.
 
@@ -8,9 +8,11 @@ If you want the full picture of what's actually happening at each step, `docs/pr
 
 - Docker Desktop (or an equivalent Docker daemon) running.
 - Claude Code, with the target project open as a repo.
-- The PromptOps daemon runs **once per machine**, not once per repo — if a teammate already started it, skip straight to [Install the plugin into your project](#2-install-the-plugin-into-your-project).
+- The PromptOps daemon runs **once per machine**, not once per repo — if a teammate already started it, skip straight to [Install the plugin](#install-the-plugin).
 
-## 1. Start the daemon
+## 1. One-time setup, from a console
+
+### Start the daemon
 
 Run the daemon from the published package in GitHub Container Registry (GHCR):
 
@@ -25,11 +27,11 @@ Invoke-RestMethod http://127.0.0.1:5179/health
 # {"status":"ok","pluginsLoaded":2}
 ```
 
-The daemon binds to `127.0.0.1` only — it's never reachable from outside this machine (ADR-0007). Its SQLite database lives in a named Docker volume (`promptops-data`) that survives restarts. Full details, backup/restore, and configuring the `sonar`/`build-result` metric plugins: [daemon-setup.md](file:///F:/repos/ctacke/PromptOps/docs/daemon-setup.md).
+The daemon binds to `127.0.0.1` only — it's never reachable from outside this machine (ADR-0007). Its SQLite database lives in a named Docker volume (`promptops-data`) that survives restarts. Full details, backup/restore, and configuring the `sonar`/`build-result` metric plugins: `docs/daemon-setup.md`.
 
 If you'd rather have Claude Code do this step for you inside a session, `/promptops setup` walks through the same thing.
 
-## 2. Install the plugin into your project
+### Install the plugin
 
 From inside your **existing project's repo**, in a Claude Code session:
 
@@ -38,9 +40,13 @@ claude plugin marketplace add ctacke/PromptOps
 claude plugin install promptops@promptops
 ```
 
-This registers the session hooks, the daemon as an MCP server, and the `/promptops` skills — no further config editing needed. Full details: `docs/installing-promptops.md`.
+Same mechanism used to install `context-mode`. This registers the four session hooks (`SessionStart`/`PreToolUse`/`PostToolUse`/`SessionEnd`), the daemon as an MCP server (`claude-plugin/.mcp.json` already points at `http://127.0.0.1:5179/mcp` — nothing further to configure), and the `/promptops` skills. Full details: `docs/installing-promptops.md`.
 
-## 3. Add your first prompt
+## 2. Start Claude Code in your repo
+
+Just `claude`, as normal — nothing else changes about how you work. The `SessionStart` hook fires transparently: it checks the daemon's health, gathers repo/branch/commit/developer-id/detected-languages *locally* (the daemon has no filesystem access to your repo), and opens an `ExecutionRecord` for the session. If the daemon isn't reachable, you'll see a note in context that tracking is disabled for this session — everything else still works, nothing is lost.
+
+## 3. `/promptops init` — seed your first prompts
 
 PromptOps needs at least one `Prompt`/`PromptVersion` to track work against. There's no auto-import of prompts you've been keeping elsewhere — you create them once, then reuse and refine them through everything below.
 
@@ -48,13 +54,9 @@ The fastest path is:
 
 > `/promptops init`
 
-This seeds the shared database with eight starter prompts covering common developer activities (fix a bug, add a feature, write tests, refactor, document, review a PR, investigate a performance issue, security review) — already tagged so `/promptops recommend` can match against them from day one. It's safe to run more than once, from any repo: it checks names first and only creates what's missing, so running it again from a second project won't duplicate the catalog in the shared database.
+This seeds the shared database with eight starter prompts covering common developer activities (fix a bug, add a feature, write tests, refactor, document, review a PR, investigate a performance issue, security review) — each created *and* activated (not left in Draft), already tagged so `/promptops recommend` can match against them from day one. It's safe to run more than once, from any repo: it checks names first and only creates what's missing, so running it again from a second project won't duplicate the catalog in the shared database.
 
-For anything not covered by the starter set, ask Claude to create one — it has `create_prompt` and `create_prompt_version` MCP tools available once the plugin is installed:
-
-> "Create a PromptOps prompt called 'Fix a bug' with content 'Investigate the reported bug, identify the root cause, and fix it with a minimal, targeted change.' and tag it `bugfix`."
-
-Or call the REST API directly:
+For anything not covered by the starter set, ask Claude to create one in plain language — it has `create_prompt`/`create_prompt_version` MCP tools available once the plugin is installed — or call the REST API directly:
 
 ```powershell
 $prompt = Invoke-RestMethod http://127.0.0.1:5179/prompts -Method Post -ContentType "application/json" -Body (@{
@@ -68,65 +70,87 @@ Invoke-RestMethod "http://127.0.0.1:5179/prompts/$($prompt.id)/versions" -Method
 } | ConvertTo-Json)
 ```
 
-A new version always starts as `Draft`. It doesn't need to be `Active` for execution tracking or scoring to work — only for it to be the one recommendations and auto-promotion treat as "the current one" (step 6).
+A new version always starts as `Draft`. It doesn't need to be `Active` for execution tracking or scoring to work — only for it to be the one recommendations and auto-promotion treat as "the current one" (step 10). Repeat this for each distinct kind of task you want PromptOps to learn from separately — you don't need to front-load all of them; add more as you notice a recurring task that doesn't have one yet.
 
-Repeat this for each distinct kind of task you want PromptOps to learn from separately — "fix a bug," "add a test," "write a migration," whatever categories make sense for your team. You don't need to front-load all of them; add more as you notice a recurring task that doesn't have one yet.
+### 3a. Optional: connect engineering metrics
 
-## 4. Just use Claude Code normally
+There's no daemon-side pull integration for CI or Sonar — it's push-based:
 
-Nothing else changes about how you work. Start a session, do the task, end the session. In the background:
+- **Sonar**: set `PROMPTOPS_SONAR_BASE_URL`/`PROMPTOPS_SONAR_TOKEN` before starting the daemon (or restart it after setting them) — the daemon then queries the SonarQube/SonarCloud measures API itself, per execution's repository.
+- **CI (build/test results)**: no config needed, but your CI job has to push the raw content itself: `POST /executions/{id}/metrics/collect` with `{"parameters": {"trx": "...", "cobertura": "..."}}` after a build finishes.
 
-- `SessionStart` opens an `ExecutionRecord` for the session.
-- Every tool call gets logged (name, count, duration).
-- `SessionEnd` computes what actually changed (files/lines) and closes out the record.
+See `docs/metrics.md` for the exact commands and payload shapes.
 
-Verify it's working:
+### 3b. Optional: trust the AI judge right away with `/promptops evaluate`
+
+Running this before you've even made a change (or right after your first one) walks the client-delegated flow — this replaces MCP's now-deprecated `sampling` capability (ADR-0010). The daemon's `prepare_ai_evaluation` hands back a judge prompt and a correlation id *without* calling any model itself; Claude Code answers that prompt itself, using its own current reasoning — reviewing the session's task honestly, not rubber-stamping its own output; then `submit_ai_evaluation_result` records the verdict, or asks for one corrected retry (up to 3 attempts) if the answer didn't match the required schema. No separate AI backend, no extra credentials — the daemon never touches a model in this flow.
+
+## 4. Do some Claude Code development. While you work, the plugin will:
+
+- Time every tool call: `PreToolUse` writes a start timestamp locally (no network call, so it stays fast); `PostToolUse` pairs it with the tool name and duration and posts one tool-usage record to your session's `ExecutionRecord` on the daemon.
+- Do all of this best-effort and silently — a daemon hiccup here never surfaces as an error, since the tool call itself already succeeded regardless.
+
+## 5. Ending a session — `/exit`, not `/clear`
+
+**Only `/exit` (or otherwise closing the session) finalizes the execution.** `/clear` clears your context but does **not** end the session in the hook-lifecycle sense — it isn't one of the four events this plugin listens for, so it does *not* trigger the finish step below. If you `/clear` mid-session expecting a clean boundary, the same `ExecutionRecord` just keeps accumulating tool usage until you actually exit.
+
+When the session really ends, `SessionEnd` fires: it computes a `git diff --numstat` against the commit recorded at `SessionStart` (files changed, lines added/removed) and posts `executionTimeMs`/`aiProviderId: "claude-code"`/those diff stats to `/executions/{id}/finish`, marking the record `Finished`. Best-effort with a short timeout — it can't block session termination, so on a daemon hiccup here the record is simply left unfinished rather than the session hanging.
+
+Verify it worked:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:5179/executions/<execution-id>
 ```
 
-should show `"status":"Finished"` with non-empty `filesChanged` after you've edited something and ended the session.
+should show `"status":"Finished"` with non-empty `filesChanged` after you've edited something and exited.
 
-## 5. Rate the result — optional
+## 6. Whenever you want to review — run `/promptops rate`
 
-Once a session's execution has finished, ask Claude:
+Do this after any session, or on demand — you'll want to do it more often while the database is still new (thin history means noisier recommendations later). It:
 
-> `/promptops rate`
+- Finds your current session's execution id automatically.
+- Asks eight quick ratings (via `AskUserQuestion`, not free text): correctness, helpfulness, architecture, readability, completeness, hallucinations (yes/no), your own confidence, and overall satisfaction — plus optional notes.
+- Submits a `HumanEvaluation` (immutable, additive — rating the same execution twice adds a second row, never overwrites the first).
+- That submission is one of the three triggers (rating / engineering metrics / AI evaluation) that automatically recomputes the prompt version's score — you don't run anything else for that to happen.
 
-It'll ask you a handful of 1-5 questions (correctness, helpfulness, architecture quality, readability, completeness, hallucinations, confidence, overall satisfaction) and submit them as a `HumanEvaluation`. Scoring recomputes automatically whenever new data lands for an execution — a rating, metrics arriving, or an AI evaluation — so you don't need to trigger anything else afterward.
+## 7. Back to step 4 — keep developing, keep rating.
 
-If you also want the AI-judge pass (`docs/ai-evaluation.md`) — a second AI opinion checking the diff against acceptance criteria and ADRs — ask Claude:
+## 8. After some ratings build up, ask for a recommendation with `/promptops recommend`
 
-> `/promptops evaluate`
-
-Or turn it on for every execution automatically, no manual step needed:
-
-> `/promptops evaluate` — turn on automatic AI evaluation
-
-(equivalently, `Invoke-RestMethod http://127.0.0.1:5179/ai-evaluation-policy -Method Put -ContentType "application/json" -Body '{"autoEvaluateOnFinish":true}'`). It's off by default since each evaluation is a real judge-model call.
-
-Engineering metrics (build/test/Sonar) arrive on their own once CI runs, if those plugins are configured — see `docs/daemon-setup.md`.
-
-## 6. Get a recommendation next time
-
-Starting a new task, ask Claude:
+There's no fixed threshold — do this more often while the database is new, since recommendations sharpen as more scored executions accumulate; even a handful is enough to get tag-matched results. Give it a plain task description, not tags:
 
 > `/promptops recommend` — I need to fix a null reference exception in the login flow.
 
-The daemon classifies your task description into activity tags, then ranks every prompt version on the machine — blending semantic similarity, tag match, and historical score (`docs/knowledge-base.md`, `docs/recommendations.md`) — and returns ranked results with a stated rationale, not just a score. This spans every repo tracked on this machine, not just the current one, so a prompt proven in one project surfaces for similar work in another.
+It:
 
-It doesn't apply anything automatically — picking a recommended `promptVersionId` and actually using its content for your next prompt is still your call.
+- Classifies your task description into activity tags internally (no separate step for you), then ranks every `PromptVersion` on the machine — not just this repo, unless you ask it to filter to one — blending tag match and historical score. Scored candidates always outrank unscored ones; among scored, higher score wins, tag-match count is the tiebreaker.
+- Presents each candidate's `rationale` in plain language (e.g. "Matched 2/2 requested tags. Score 87.5/100 from 6 executions across 3 repos.") alongside the recommended version id — never just a bare score.
+- **Never applies anything automatically** — picking it up and actually using its content for your next prompt is your call, always.
 
-## 7. Let good versions promote themselves — optional
+## 9. Back to step 4 again.
 
-By default, nothing ever marks a version `Active` on its own — you decide when a `PromptVersion` is the one to treat as current:
+## 10. Once you're confident, go hands-off
+
+You don't have to go all the way to full automation to stop hand-activating versions — a single
+manual step covers that on its own, whenever you decide a version is ready:
 
 ```powershell
 Invoke-RestMethod "http://127.0.0.1:5179/prompts/$promptId/versions/$versionId/activate" -Method Post
 ```
 
-If you'd rather the daemon do this automatically once a version proves itself, turn on the promotion policy:
+For the rest of the loop, two independent policy toggles get you fully hands-off — turning both on removes `/promptops rate` and `/promptops evaluate` from the loop entirely:
+
+**Automatic AI evaluation:**
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5179/ai-evaluation-policy -Method Put -ContentType "application/json" -Body '{"autoEvaluateOnFinish":true}'
+```
+
+(or ask `/promptops evaluate` to flip it). The daemon then runs the judge itself the moment every session finishes, in the background, no `/promptops evaluate` needed. It's off by default since each evaluation is a real judge-model call.
+
+**Caveat, today:** this requires the daemon to have a real AI backend configured (`AIExecution:Provider`) — out of the box it's bound to a test stub with nothing to answer the judge prompt, so turning this on without also configuring a real provider fails silently in the background (logged, never surfaced) rather than actually judging anything. A design for doing this via the client-side session-end hook instead — reusing your own already-logged-in `claude` CLI, no daemon credentials at all — exists (`docs/ai-evaluation.md`, "Phase 13") but isn't built yet.
+
+**Automatic prompt promotion:**
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:5179/promotion-policy -Method Put -ContentType "application/json" -Body (@{
@@ -137,7 +161,9 @@ Invoke-RestMethod http://127.0.0.1:5179/promotion-policy -Method Put -ContentTyp
 } | ConvertTo-Json)
 ```
 
-From then on, any version whose computed score clears the threshold (or beats the currently active version's score by a configured margin) gets activated with no `/promptops rate` and no manual step. Full details, including why `requireHumanEvaluation` and `autoPromotionEnabled` are linked: `docs/promotion-policy.md`.
+Any `PromptVersion` whose recomputed score clears `minimumScoreThreshold` (or beats the currently-active version by `minimumMarginOverActive`) gets activated automatically — no manual `.../activate` call needed. `requireHumanEvaluation` must be `false` for auto-promotion to be allowed at all — that's the explicit trade you're making by turning this on. Full details, including why the two fields are linked: `docs/promotion-policy.md`.
+
+With both toggles set: sessions run, executions finish, the judge evaluates automatically, scores recompute, and winning versions promote themselves — the loop above (steps 4–9) keeps happening without you doing anything beyond writing code.
 
 ## Where things stand
 
