@@ -16,15 +16,20 @@ public static class AIEvaluationPolicyEndpoints
 
         app.MapPut("/ai-evaluation-policy", async (UpdateAIEvaluationPolicyRequest request, AIEvaluationPolicyService service, CancellationToken cancellationToken) =>
         {
-            var policy = await service.UpdateAsync(request.AutoEvaluateOnFinish, cancellationToken);
+            var mechanism = request.Mechanism is null
+                ? AutoEvaluationMechanism.Daemon
+                : Enum.Parse<AutoEvaluationMechanism>(request.Mechanism, ignoreCase: true);
+
+            var policy = await service.UpdateAsync(request.AutoEvaluateOnFinish, mechanism, cancellationToken);
             return Results.Ok(AIEvaluationPolicyResponse.From(policy));
         });
     }
 }
 
-internal sealed record UpdateAIEvaluationPolicyRequest(bool AutoEvaluateOnFinish);
+/// <summary><c>Mechanism</c> is optional and defaults to <see cref="AutoEvaluationMechanism.Daemon"/> when omitted (Phase 13) — every existing caller that only ever sent <c>autoEvaluateOnFinish</c> keeps behaving exactly as it does today.</summary>
+internal sealed record UpdateAIEvaluationPolicyRequest(bool AutoEvaluateOnFinish, string? Mechanism = null);
 
-internal sealed record AIEvaluationPolicyResponse(Guid Id, bool AutoEvaluateOnFinish, DateTimeOffset UpdatedAt)
+internal sealed record AIEvaluationPolicyResponse(Guid Id, bool AutoEvaluateOnFinish, string Mechanism, DateTimeOffset UpdatedAt)
 {
-    public static AIEvaluationPolicyResponse From(AIEvaluationPolicy policy) => new(policy.Id, policy.AutoEvaluateOnFinish, policy.UpdatedAt);
+    public static AIEvaluationPolicyResponse From(AIEvaluationPolicy policy) => new(policy.Id, policy.AutoEvaluateOnFinish, policy.Mechanism.ToString(), policy.UpdatedAt);
 }

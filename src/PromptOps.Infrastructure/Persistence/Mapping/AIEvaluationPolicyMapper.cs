@@ -9,15 +9,17 @@ internal static class AIEvaluationPolicyMapper
     {
         Id = policy.Id,
         AutoEvaluateOnFinish = policy.AutoEvaluateOnFinish,
+        Mechanism = policy.Mechanism.ToString(),
         UpdatedAt = policy.UpdatedAt
     };
 
     public static void ApplyChanges(AIEvaluationPolicyEntity entity, AIEvaluationPolicy policy)
     {
         entity.AutoEvaluateOnFinish = policy.AutoEvaluateOnFinish;
+        entity.Mechanism = policy.Mechanism.ToString();
         entity.UpdatedAt = policy.UpdatedAt;
     }
 
     public static AIEvaluationPolicy ToDomain(AIEvaluationPolicyEntity entity) => AIEvaluationPolicy.Rehydrate(
-        entity.Id, entity.AutoEvaluateOnFinish, entity.UpdatedAt);
+        entity.Id, entity.AutoEvaluateOnFinish, Enum.Parse<AutoEvaluationMechanism>(entity.Mechanism), entity.UpdatedAt);
 }

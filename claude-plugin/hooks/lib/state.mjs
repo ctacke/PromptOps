@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, appendFileSync, rmSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -23,6 +23,21 @@ export function executionStatePath(sessionId) {
 
 export function toolTimerPath(sessionId, toolUseId) {
   return join(stateDir(), "tools", sessionId, `${toolUseId}.json`);
+}
+
+/** Where a detached background script (e.g. auto-evaluate.mjs) logs, since its stdio is discarded. */
+export function logPath(name) {
+  return join(stateDir(), "logs", `${name}.log`);
+}
+
+/** Best-effort append-only log — a logging failure must never surface anywhere a caller can see. */
+export function appendLog(path, message) {
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, `[${new Date().toISOString()}] ${message}\n`, "utf8");
+  } catch {
+    // best-effort logging only
+  }
 }
 
 export function readJson(path) {

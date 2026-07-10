@@ -11,5 +11,6 @@ public sealed class AIEvaluationPolicyEntityConfiguration : IEntityTypeConfigura
         builder.ToTable("AIEvaluationPolicies");
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
+        builder.Property(p => p.Mechanism).IsRequired().HasMaxLength(50);
     }
 }

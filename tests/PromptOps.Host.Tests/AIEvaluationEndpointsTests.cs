@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
+using PromptOps.Application.Evaluations;
 using Xunit;
 
 namespace PromptOps.Host.Tests;
@@ -100,6 +101,115 @@ public class AIEvaluationEndpointsTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Empty(evaluations!);
     }
 
+    [Fact]
+    public async Task Prepare_returns_a_prompt_and_correlation_id_for_a_known_execution()
+    {
+        var executionId = await StartExecutionAsync(["Endpoint returns 404 for unknown ids"]);
+
+        var response = await _client.PostAsync($"/executions/{executionId}/ai-evaluations/prepare", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var prepared = await response.Content.ReadFromJsonAsync<PrepareResponse>();
+        Assert.NotEqual(Guid.Empty, prepared!.CorrelationId);
+        Assert.Contains("Endpoint returns 404 for unknown ids", prepared.Prompt);
+    }
+
+    [Fact]
+    public async Task Prepare_returns_404_for_an_unknown_execution()
+    {
+        var response = await _client.PostAsync($"/executions/{Guid.NewGuid()}/ai-evaluations/prepare", null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Submit_with_a_valid_response_records_and_returns_the_evaluation()
+    {
+        var executionId = await StartExecutionAsync();
+        var prepared = await PrepareAsync(executionId);
+
+        var submitResponse = await _client.PostAsJsonAsync($"/executions/{executionId}/ai-evaluations/submit", new
+        {
+            correlationId = prepared.CorrelationId,
+            response = """{"satisfiesAcceptanceCriteria":true,"adrViolations":[],"ignoredRequirements":[],"unnecessaryComplexityNotes":null,"suggestedPromptImprovements":[]}"""
+        });
+
+        Assert.Equal(HttpStatusCode.OK, submitResponse.StatusCode);
+        var result = await submitResponse.Content.ReadFromJsonAsync<SubmitResponse>();
+        Assert.Equal("recorded", result!.Status);
+        Assert.Equal("client-delegated", result.Evaluation!.JudgeProviderId);
+        Assert.True(result.Evaluation.SatisfiesAcceptanceCriteria);
+    }
+
+    [Fact]
+    public async Task Submit_with_an_invalid_response_asks_for_a_retry_and_keeps_the_correlation_usable()
+    {
+        var executionId = await StartExecutionAsync();
+        var prepared = await PrepareAsync(executionId);
+
+        var submitResponse = await _client.PostAsJsonAsync($"/executions/{executionId}/ai-evaluations/submit", new
+        {
+            correlationId = prepared.CorrelationId,
+            response = "not json"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, submitResponse.StatusCode);
+        var result = await submitResponse.Content.ReadFromJsonAsync<SubmitResponse>();
+        Assert.Equal("retry_needed", result!.Status);
+        Assert.NotNull(result.Prompt);
+
+        var second = await _client.PostAsJsonAsync($"/executions/{executionId}/ai-evaluations/submit", new
+        {
+            correlationId = result.CorrelationId,
+            response = """{"satisfiesAcceptanceCriteria":true}"""
+        });
+        var secondResult = await second.Content.ReadFromJsonAsync<SubmitResponse>();
+        Assert.Equal("recorded", secondResult!.Status);
+    }
+
+    [Fact]
+    public async Task Submit_returns_502_once_attempts_are_exhausted()
+    {
+        var executionId = await StartExecutionAsync();
+        var prepared = await PrepareAsync(executionId);
+        var correlationId = prepared.CorrelationId;
+
+        HttpResponseMessage last = null!;
+        for (var i = 0; i < JudgePromptBuilder.MaxAttempts; i++)
+        {
+            last = await _client.PostAsJsonAsync($"/executions/{executionId}/ai-evaluations/submit", new
+            {
+                correlationId,
+                response = "still not json"
+            });
+
+            if (last.StatusCode == HttpStatusCode.BadGateway) break;
+
+            var retry = await last.Content.ReadFromJsonAsync<SubmitResponse>();
+            correlationId = retry!.CorrelationId!.Value;
+        }
+
+        Assert.Equal(HttpStatusCode.BadGateway, last.StatusCode);
+    }
+
+    [Fact]
+    public async Task Submit_returns_404_for_an_unknown_correlation_id()
+    {
+        var response = await _client.PostAsJsonAsync($"/executions/{Guid.NewGuid()}/ai-evaluations/submit", new
+        {
+            correlationId = Guid.NewGuid(),
+            response = """{"satisfiesAcceptanceCriteria":true}"""
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private async Task<PrepareResponse> PrepareAsync(Guid executionId)
+    {
+        var response = await _client.PostAsync($"/executions/{executionId}/ai-evaluations/prepare", null);
+        return (await response.Content.ReadFromJsonAsync<PrepareResponse>())!;
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
@@ -109,6 +219,10 @@ public class AIEvaluationEndpointsTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     private sealed record StartResponse(Guid ExecutionId);
+
+    private sealed record PrepareResponse(Guid CorrelationId, string Prompt);
+
+    private sealed record SubmitResponse(string Status, Guid? CorrelationId, string? Prompt, AIEvaluationResponse? Evaluation);
 
     private sealed record AIEvaluationResponse(
         Guid Id, Guid ExecutionId, string JudgeProviderId, string? JudgeModel,

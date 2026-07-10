@@ -15,6 +15,9 @@ namespace PromptOps.Infrastructure.Evaluations;
 /// The actual evaluation runs in a detached background task with its own DI scope. Gated behind
 /// <see cref="AIEvaluationPolicy"/>'s <c>AutoEvaluateOnFinish</c> — off by default, since the judge
 /// is a real (eventually paid) LLM call, not something to fire unconditionally on every execution.
+/// Also gated on <c>Mechanism == Daemon</c> (Phase 13): when the policy instead selects
+/// <c>ClientHook</c>, the per-repo plugin's <c>SessionEnd</c> hook is entirely responsible for
+/// automatic evaluation and this trigger must stay silent, or every execution would be judged twice.
 /// </summary>
 public sealed class AutoAIEvaluationTrigger(
     IServiceScopeFactory scopeFactory,
@@ -24,7 +27,7 @@ public sealed class AutoAIEvaluationTrigger(
     public async Task HandleAsync(ExecutionRecorded domainEvent, CancellationToken cancellationToken = default)
     {
         var policy = await policyRepository.GetAsync(cancellationToken);
-        if (policy is not { AutoEvaluateOnFinish: true })
+        if (policy is not { AutoEvaluateOnFinish: true, Mechanism: AutoEvaluationMechanism.Daemon })
             return;
 
         _ = Task.Run(async () =>

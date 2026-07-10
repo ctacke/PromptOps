@@ -9,8 +9,13 @@
 // `SessionEnd` is the event that actually fires once, when the session ends, so that's what's
 // wired here instead. Tool usage is still recorded continuously across every turn via
 // PreToolUse/PostToolUse, so nothing is lost by not finishing on every `Stop`.
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { daemonUrl, executionStatePath, fetchWithTimeout, readJson } from "./lib/state.mjs";
 import { diffStats } from "./lib/git.mjs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const raw = [];
 for await (const chunk of process.stdin) raw.push(chunk);
@@ -42,6 +47,27 @@ try {
   );
 } catch {
   // Best-effort: SessionEnd hooks can't block session termination anyway.
+}
+
+// Client-side automatic evaluation (Phase 13/ADR-0010 amendment): only when the daemon's policy
+// opts into ClientHook instead of its own (Daemon-owned) automatic trigger. Spawned detached so this
+// hook's own exit is never delayed by a `claude -p` round trip, which can take many seconds — see
+// auto-evaluate.mjs's own comment for why the detach (not just this call) matters.
+try {
+  const policyResponse = await fetchWithTimeout(`${daemonUrl()}/ai-evaluation-policy`, {}, 3000);
+  if (policyResponse.ok) {
+    const policy = await policyResponse.json();
+    if (policy.autoEvaluateOnFinish && policy.mechanism === "ClientHook") {
+      const child = spawn(
+        process.execPath,
+        [join(__dirname, "auto-evaluate.mjs"), execution.executionId],
+        { detached: true, stdio: "ignore" }
+      );
+      child.unref();
+    }
+  }
+} catch {
+  // Best-effort: a policy-check hiccup here must never block session termination either.
 }
 
 process.exit(0);

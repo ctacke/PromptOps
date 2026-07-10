@@ -18,11 +18,14 @@ public sealed class AIEvaluationPolicyService(IAIEvaluationPolicyRepository repo
         return created;
     }
 
-    public async Task<AIEvaluationPolicy> UpdateAsync(bool autoEvaluateOnFinish, CancellationToken cancellationToken = default)
+    public async Task<AIEvaluationPolicy> UpdateAsync(
+        bool autoEvaluateOnFinish,
+        AutoEvaluationMechanism mechanism = AutoEvaluationMechanism.Daemon,
+        CancellationToken cancellationToken = default)
     {
         var policy = await GetOrCreateDefaultAsync(cancellationToken);
 
-        policy.Update(autoEvaluateOnFinish);
+        policy.Update(autoEvaluateOnFinish, mechanism);
 
         await repository.UpdateAsync(policy, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);

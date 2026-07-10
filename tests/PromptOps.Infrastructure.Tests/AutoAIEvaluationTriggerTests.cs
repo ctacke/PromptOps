@@ -22,7 +22,8 @@ public class AutoAIEvaluationTriggerTests
 {
     private static ExecutionRecorded EventFor(Guid executionId) => new(executionId, Guid.NewGuid(), "repo-a", DateTimeOffset.UtcNow);
 
-    private static (AutoAIEvaluationTrigger Trigger, FakeAIEvaluationProvider Provider, FakePolicyRepository Policy) Build(bool autoEvaluateOnFinish)
+    private static (AutoAIEvaluationTrigger Trigger, FakeAIEvaluationProvider Provider, FakePolicyRepository Policy) Build(
+        bool autoEvaluateOnFinish, AutoEvaluationMechanism mechanism = AutoEvaluationMechanism.Daemon)
     {
         var provider = new FakeAIEvaluationProvider();
         var services = new ServiceCollection();
@@ -33,7 +34,7 @@ public class AutoAIEvaluationTriggerTests
         var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
         var policy = AIEvaluationPolicy.CreateDefault();
-        policy.Update(autoEvaluateOnFinish);
+        policy.Update(autoEvaluateOnFinish, mechanism);
         var policyRepository = new FakePolicyRepository(policy);
 
         var trigger = new AutoAIEvaluationTrigger(scopeFactory, policyRepository, NullLogger<AutoAIEvaluationTrigger>.Instance);
@@ -44,6 +45,17 @@ public class AutoAIEvaluationTriggerTests
     public async Task Does_Nothing_When_Auto_Evaluate_Is_Disabled()
     {
         var (trigger, provider, _) = Build(autoEvaluateOnFinish: false);
+
+        await trigger.HandleAsync(EventFor(Guid.NewGuid()));
+        await Task.Delay(50); // give any (unwanted) background work a chance to run
+
+        Assert.Equal(0, provider.CallCount);
+    }
+
+    [Fact]
+    public async Task Does_Nothing_When_Mechanism_Is_ClientHook_Even_If_Auto_Evaluate_Is_Enabled()
+    {
+        var (trigger, provider, _) = Build(autoEvaluateOnFinish: true, mechanism: AutoEvaluationMechanism.ClientHook);
 
         await trigger.HandleAsync(EventFor(Guid.NewGuid()));
         await Task.Delay(50); // give any (unwanted) background work a chance to run

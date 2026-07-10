@@ -23,6 +23,7 @@ public class AIEvaluationPolicyEndpointsTests : IClassFixture<WebApplicationFact
 
         var policy = await response.Content.ReadFromJsonAsync<AIEvaluationPolicyResponse>();
         Assert.False(policy!.AutoEvaluateOnFinish);
+        Assert.Equal("Daemon", policy.Mechanism);
     }
 
     [Fact]
@@ -37,6 +38,29 @@ public class AIEvaluationPolicyEndpointsTests : IClassFixture<WebApplicationFact
         Assert.True(policy!.AutoEvaluateOnFinish);
     }
 
+    [Fact]
+    public async Task Put_Omitting_Mechanism_Defaults_To_Daemon()
+    {
+        var putResponse = await _client.PutAsJsonAsync("/ai-evaluation-policy", new { autoEvaluateOnFinish = true });
+
+        var policy = await putResponse.Content.ReadFromJsonAsync<AIEvaluationPolicyResponse>();
+        Assert.Equal("Daemon", policy!.Mechanism);
+    }
+
+    [Fact]
+    public async Task Put_Can_Set_Mechanism_To_ClientHook()
+    {
+        var putResponse = await _client.PutAsJsonAsync("/ai-evaluation-policy", new { autoEvaluateOnFinish = true, mechanism = "ClientHook" });
+        Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
+
+        var policy = await putResponse.Content.ReadFromJsonAsync<AIEvaluationPolicyResponse>();
+        Assert.Equal("ClientHook", policy!.Mechanism);
+
+        var getResponse = await _client.GetAsync("/ai-evaluation-policy");
+        var reGet = await getResponse.Content.ReadFromJsonAsync<AIEvaluationPolicyResponse>();
+        Assert.Equal("ClientHook", reGet!.Mechanism);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
@@ -45,5 +69,5 @@ public class AIEvaluationPolicyEndpointsTests : IClassFixture<WebApplicationFact
         GC.SuppressFinalize(this);
     }
 
-    private sealed record AIEvaluationPolicyResponse(Guid Id, bool AutoEvaluateOnFinish, DateTimeOffset UpdatedAt);
+    private sealed record AIEvaluationPolicyResponse(Guid Id, bool AutoEvaluateOnFinish, string Mechanism, DateTimeOffset UpdatedAt);
 }

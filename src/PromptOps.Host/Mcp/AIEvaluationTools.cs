@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
 using PromptOps.Application.Evaluations;
+using PromptOps.Domain.Evaluations;
 
 namespace PromptOps.Host.Mcp;
 
@@ -37,20 +38,25 @@ public sealed class AIEvaluationTools(AIEvaluationService evaluationService, AIE
     }
 
     [McpServerTool(Name = "get_ai_evaluation_policy")]
-    [Description("Gets whether AI evaluation runs automatically when an execution finishes.")]
+    [Description("Gets whether AI evaluation runs automatically when an execution finishes, and which mechanism runs it (Daemon or ClientHook).")]
     public async Task<object> GetAIEvaluationPolicy(CancellationToken cancellationToken = default)
     {
         var policy = await policyService.GetOrCreateDefaultAsync(cancellationToken);
-        return new { policy.Id, policy.AutoEvaluateOnFinish, policy.UpdatedAt };
+        return new { policy.Id, policy.AutoEvaluateOnFinish, Mechanism = policy.Mechanism.ToString(), policy.UpdatedAt };
     }
 
     [McpServerTool(Name = "update_ai_evaluation_policy")]
-    [Description("Turns automatic AI evaluation on execution finish on or off.")]
+    [Description("Turns automatic AI evaluation on execution finish on or off, and picks which mechanism runs it.")]
     public async Task<object> UpdateAIEvaluationPolicy(
         [Description("Whether the daemon should automatically run the AI judge when an execution finishes.")] bool autoEvaluateOnFinish,
+        [Description("Which mechanism runs it automatically: \"Daemon\" (the daemon calls a daemon-owned AI backend itself, default) or \"ClientHook\" (the per-repo plugin's SessionEnd hook delegates to the developer's own already-authenticated claude CLI instead). Defaults to Daemon when omitted.")] string? mechanism = null,
         CancellationToken cancellationToken = default)
     {
-        var policy = await policyService.UpdateAsync(autoEvaluateOnFinish, cancellationToken);
-        return new { policy.Id, policy.AutoEvaluateOnFinish, policy.UpdatedAt };
+        var parsedMechanism = mechanism is null
+            ? AutoEvaluationMechanism.Daemon
+            : Enum.Parse<AutoEvaluationMechanism>(mechanism, ignoreCase: true);
+
+        var policy = await policyService.UpdateAsync(autoEvaluateOnFinish, parsedMechanism, cancellationToken);
+        return new { policy.Id, policy.AutoEvaluateOnFinish, Mechanism = policy.Mechanism.ToString(), policy.UpdatedAt };
     }
 }
