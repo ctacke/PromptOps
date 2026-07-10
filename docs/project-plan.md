@@ -176,7 +176,29 @@ Two artifacts run through every phase from Phase 4 onward: the **daemon** (Docke
 
 **Docs:** `docs/knowledge-base.md`.
 
-## Phase 11+ (each re-planned in detail when reached)
+## Phase 12 — Client-Delegated AI Evaluation
+
+**Context:** `run_ai_evaluation` (Phase 7) needs a real `IAIExecutionProvider` to answer the judge prompt — today that's either the `manual` test stub or a daemon-owned backend that shells out/calls an API with its own credentials. MCP's `sampling/createMessage` — the protocol feature that would let the daemon ask the *connected client* to run the completion on its own already-authenticated model — was deprecated (SEP-2577) before Claude Code or any mainstream client implemented the client side. This phase gets the same effect (no duplicated credentials, provider-agnostic) via two ordinary MCP tool calls instead. Full design: `docs/ai-evaluation.md` §"Client-Delegated AI Evaluation"; decision record: ADR-0010.
+
+**Deliverables**
+- `JudgePromptBuilder`/`JudgeResponseParser` extracted from `AIJudgeEvaluationProvider` into shared, dependency-free helpers (`PromptOps.Application.Evaluations`) — no behavior change to the existing autonomous path, just de-duplication ahead of a second caller.
+- `IPendingDelegatedEvaluationStore` port + an in-memory, TTL-based default implementation (deliberately not persisted — see rationale in `docs/ai-evaluation.md`).
+- `DelegatedAIEvaluationService` (`PrepareAsync`/`SubmitAsync`), reusing `AIEvaluation.Record`/`IAIEvaluationRepository`/`IDomainEventPublisher` exactly like `AIEvaluationService.EvaluateAsync`.
+- Two new MCP tools: `prepare_ai_evaluation(executionId)`, `submit_ai_evaluation_result(correlationId, response)`.
+- `/promptops evaluate` (`claude-plugin/skills/evaluate/SKILL.md`) updated to prefer the delegated flow, with `run_ai_evaluation` documented as the fallback for non-interactive/no-client-attached use.
+
+**Acceptance criteria**
+- `prepare_ai_evaluation` never calls any model — it only builds and returns a prompt + correlation id.
+- A valid `submit_ai_evaluation_result` response persists an `AIEvaluation` (`judgeProviderId: "client-delegated"`) retrievable the same way as one produced via `run_ai_evaluation`.
+- An invalid response returns `retry_needed` with a correction prompt (not an error) until `MaxAttempts` is exhausted, matching `AIJudgeEvaluationProvider`'s existing retry semantics exactly.
+- `AutoAIEvaluationTrigger`'s automatic/background path is untouched — it keeps using a daemon-owned `IAIExecutionProvider`, since there's no live client to delegate to from a detached background task.
+- The design has no Claude-specific assumption anywhere in the daemon: any MCP client that can call a tool, reason over returned text, and call a tool back satisfies the contract.
+
+**Testing:** unit tests for the extracted builder/parser helpers and `DelegatedAIEvaluationService` (hand-rolled fakes, matching this repo's existing style — no SQLite/HTTP involved); TTL/single-use tests for the pending-evaluation store; Host-level end-to-end tests covering prepare→submit-valid, prepare→retry→submit-valid, and prepare→retry-exhaustion→502, matching `AIEvaluationEndpointsTests`' existing structure.
+
+**Docs:** `docs/ai-evaluation.md` (already updated with the design above), ADR-0010 in `docs/architecture.md` (already recorded).
+
+## Phase 13+ (each re-planned in detail when reached)
 
 - Additional daemon-side context/metric plugins: Jira, GitHub, Azure DevOps, ADR/spec document providers (network-reachable ones only — filesystem-bound sources stay hook-pushed per ADR-0005/Phase 3).
 - Observability: OpenTelemetry tracing/metrics across execution time, failure rates, scoring trends, recommendation accuracy, all queryable per-repo or across the whole daemon.

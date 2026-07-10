@@ -1,13 +1,12 @@
-namespace PromptOps.Infrastructure.Providers;
+namespace PromptOps.Application.Evaluations;
 
 /// <summary>
-/// Shared by every provider that asks an AI backend for a JSON response and needs to tolerate
+/// Shared by every consumer that asks an AI backend for a JSON response and needs to tolerate
 /// format drift — markdown fences, a sentence of prose before/after — rather than requiring an
-/// exact match (<see cref="AIJudgeEvaluationProvider"/> introduced this in Phase 7;
-/// <c>AIActivityClassifier</c> reuses it in Phase 9 for the same reason, just extracting an array
-/// instead of an object).
+/// exact match (<see cref="JudgeResponseParser"/> and <c>AIActivityClassifier</c> both need this
+/// same tolerance, one for a JSON object, the other for a JSON array).
 /// </summary>
-internal static class JsonExtraction
+public static class JsonExtraction
 {
     /// <summary>
     /// Finds the first balanced JSON object (<c>{...}</c>) or array (<c>[...]</c>) substring —

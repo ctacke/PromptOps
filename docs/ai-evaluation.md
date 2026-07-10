@@ -86,3 +86,66 @@ PUT  /ai-evaluation-policy   { "autoEvaluateOnFinish": true }
 - `AIJudgeEvaluationProviderTests` (Infrastructure, pure unit tests against a queued stub `IAIExecutionProvider` — no SQLite involved) — happy path, markdown-fence tolerance, missing-optional-fields tolerance, retry-then-succeed, retry-exhaustion-throws, execution-not-found-short-circuits-without-calling-the-judge.
 - `AIEvaluationIntegrationTests` (Infrastructure) — round-trips through real SQLite, including list-valued fields.
 - `AIEvaluationEndpointsTests` (Host) — full HTTP round trip against the real production DI graph (the real `AIJudgeEvaluationProvider` + `ManualAIExecutionProvider`, driven via `parameters.output`): run → retrieve, 404, 502 on a judge that never returns valid JSON.
+
+## Client-Delegated AI Evaluation (ADR-0010) — design
+
+`run_ai_evaluation` requires a real `IAIExecutionProvider` willing to answer the judge prompt. Today's options are both daemon-owned: `ManualAIExecutionProvider` (test stub, echoes `parameters.output`) or a real backend like `ClaudeCliAIExecutionProvider` (shells out to a locally-installed, locally-authenticated `claude` CLI — see below). Both work, but a daemon-owned backend means the daemon needs its own credentials/CLI/API key even when the thing calling it (Claude Code, or any other MCP client) is *already* running an authenticated model conversation right now.
+
+MCP originally solved exactly this with `sampling/createMessage` — a server asks the connected client to run a completion using the client's own model/session. It's gone (deprecated per SEP-2577; never implemented client-side by Claude Code or other mainstream clients — see ADR-0010). Client-delegated evaluation gets the same effect using two ordinary MCP tool calls instead of a protocol feature, so it doesn't depend on Claude Code specifically or on sampling ever coming back.
+
+### Flow
+
+```
+Client (Claude Code, or any MCP client)          Daemon
+──────────────────────────────────────           ──────
+/promptops evaluate
+  │
+  ├─ prepare_ai_evaluation(executionId) ────────▶ builds judge prompt (JudgePromptBuilder,
+  │                                               shared with AIJudgeEvaluationProvider),
+  │                                               stores a pending correlation record (TTL),
+  │◀───────────── { correlationId, prompt } ───── returns prompt — does NOT call any model
+  │
+  ├─ (the client itself reasons over `prompt`
+  │   using its own current model/session —
+  │   no tool call, no new credentials)
+  │
+  ├─ submit_ai_evaluation_result(                
+  │     correlationId, response) ───────────────▶ JudgeResponseParser.TryParse(response)
+  │                                                 success → persist AIEvaluation
+  │                                                          (judgeProviderId: "client-delegated"),
+  │                                                          same repository/domain-event path
+  │                                                          as run_ai_evaluation
+  │                                                 failure + attempts left → append correction,
+  │                                                          keep correlation pending
+  │                                                 failure + attempts exhausted → throw
+  │                                                          AIJudgeResponseInvalidException (502,
+  │                                                          same as run_ai_evaluation today)
+  │◀── { status: "recorded", evaluation } ───────
+  │      — or —
+  │◀── { status: "retry_needed", correlationId,
+  │       prompt: <correction> } ─────────────────
+  │  (loop: reason again, submit again — up to
+  │   MaxAttempts, same limit AIJudgeEvaluationProvider uses today)
+```
+
+### New pieces
+
+- **`JudgePromptBuilder`/`JudgeResponseParser`** (`PromptOps.Application.Evaluations`, plain dependency-free static helpers — no I/O, so no interface/DI needed) — `AIJudgeEvaluationProvider.BuildJudgePrompt`/`AppendCorrection`/`TryParseJudgeResponse` extracted here so both the existing autonomous path and the new delegated path build/parse against one identical implementation. `AIJudgeEvaluationProvider` becomes a thin caller of these plus `IAIExecutionProvider`.
+- **`IPendingDelegatedEvaluationStore`** (`PromptOps.Application.Evaluations`) — tracks a pending prompt by `correlationId`: `executionId`, current prompt text (grows with each correction), attempt count, expiry. Default `Infrastructure` implementation is an in-memory `ConcurrentDictionary` with TTL-based eviction (e.g. 10 minutes) — **deliberately not persisted**: a delegated evaluation is meant to complete within one live conversation turn, so surviving a daemon restart mid-flight isn't a requirement, and skipping a migration/table for something this short-lived keeps the change small. `correlationId` is server-generated and single-use (removed on success or attempt-exhaustion) purely for request/response hygiene across concurrent evaluations — not a defense against a malicious actor (ADR-0007's single-user/no-RBAC posture is unchanged).
+- **`DelegatedAIEvaluationService`** (`PromptOps.Application.Evaluations`) — `PrepareAsync(executionId)` → `{correlationId, prompt}`; `SubmitAsync(correlationId, response)` → recorded `AIEvaluation`, or a retry prompt, reusing `AIEvaluation.Record(...)` + `IAIEvaluationRepository` + `IDomainEventPublisher` exactly like `AIEvaluationService.EvaluateAsync` does.
+- **MCP tools** (`PromptOps.Host.Mcp`, alongside `AIEvaluationTools`): `prepare_ai_evaluation(executionId)`, `submit_ai_evaluation_result(correlationId, response)`. `run_ai_evaluation`/`get_ai_evaluation_policy`/`update_ai_evaluation_policy` are unchanged.
+- **`/promptops evaluate` (`claude-plugin/skills/evaluate/SKILL.md`)** updated to prefer this flow for interactive use: call `prepare_ai_evaluation`, answer the returned prompt itself (no tool call — the assistant just reasons over it like any other request), call `submit_ai_evaluation_result`, loop on `retry_needed`. Falling back to `run_ai_evaluation` remains documented for daemons with no delegation-capable client attached (e.g. driving evaluation from a plain script).
+
+### What doesn't change
+
+`AutoAIEvaluationTrigger` (automatic evaluation on execution finish, docs/ai-evaluation.md above) runs in a detached background task with no live client attached — there is nothing to delegate *to* at that point. Automatic/unattended evaluation keeps using a daemon-owned `IAIExecutionProvider` (`AIExecution:Provider` config, ADR-0003): `manual` for tests, `claude-cli` (or a future direct-API provider) for real unattended runs. Client delegation is additive for the interactive case, not a replacement for the autonomous one.
+
+### Testing (implemented)
+
+All in `PromptOps.Infrastructure.Tests` (no dedicated `PromptOps.Application.Tests` project exists — Application-layer pure logic is tested here, matching where `AIJudgeEvaluationProviderTests` already lived):
+
+- `JudgePromptBuilderTests`/`JudgeResponseParserTests` — prompt content (repository/output/AC/ADRs, "(none given)" fallback), correction-prompt assembly, happy path, markdown-fence tolerance, missing-optional-fields tolerance, no-JSON-found failure.
+- `DelegatedAIEvaluationServiceTests` (hand-rolled fakes matching this repo's existing style — `FakeExecutionRepository`, `FakeAIEvaluationRepository`, `FakeDomainEventPublisher`) — prepare returns a correlation id + prompt and throws `ExecutionNotFoundException` for an unknown execution; submit with valid JSON persists (`judgeProviderId: "client-delegated"`), publishes domain events, and removes the pending entry; submit with invalid JSON returns a retry prompt and keeps the correlation id usable for a second attempt; exhausting `JudgePromptBuilder.MaxAttempts` throws `AIJudgeResponseInvalidException`; submitting an unknown correlation id throws `PendingEvaluationNotFoundException` instead of silently no-oping.
+- `InMemoryPendingDelegatedEvaluationStoreTests` — create/get round-trip, unknown-id lookup, TTL eviction (via a manual `TimeProvider`, permanent once evicted), update refreshes prompt/attempt/expiry, remove.
+
+Not yet added: a Host-level MCP end-to-end test for `prepare_ai_evaluation`/`submit_ai_evaluation_result` — no existing test exercises an MCP tool class directly today (`AIEvaluationTools` itself isn't tested either; only the services/endpoints underneath it are), so `DelegatedAIEvaluationTools`' thin pass-through follows that same convention rather than introducing a new one.

@@ -1,62 +1,66 @@
-# context-mode — MANDATORY routing rules
+# PromptOps — project instructions
 
-You have context-mode MCP tools available. These rules are NOT optional — they protect your context window from flooding. A single unrouted command can dump 56 KB into context and waste the entire session.
+PromptOps is prompt versioning, evaluation, and continuous improvement for AI-assisted
+development. It runs as a local Docker daemon (`ghcr.io/ctacke/promptops`) exposing MCP tools
+and slash commands (`/promptops init|rate|evaluate|recommend|history|setup`) to any repo that
+installs the Claude Code plugin under `claude-plugin/`.
 
-## BLOCKED commands — do NOT attempt these
+Use normal tools here — Bash, Read, Grep, Glob, WebFetch — the same as any other repo. Don't
+route tool calls through context-mode or another plugin unless explicitly asked to.
 
-### curl / wget — BLOCKED
-Any Bash command containing `curl` or `wget` is intercepted and replaced with an error message. Do NOT retry.
-Instead use:
-- `ctx_fetch_and_index(url, source)` to fetch and index web pages
-- `ctx_execute(language: "javascript", code: "const r = await fetch(...)")` to run HTTP calls in sandbox
+## Solution layout
 
-### Inline HTTP — BLOCKED
-Any Bash command containing `fetch('http`, `requests.get(`, `requests.post(`, `http.get(`, or `http.request(` is intercepted and replaced with an error message. Do NOT retry with Bash.
-Instead use:
-- `ctx_execute(language, code)` to run HTTP calls in sandbox — only stdout enters context
+```
+PromptOps.slnx
+src/
+  PromptOps.Domain          entities/value objects, zero dependencies (ADR-0002)
+  PromptOps.Application     use cases, provider interfaces/ports (ADR-0003), depends only on Domain
+  PromptOps.Infrastructure  default implementations of Application's ports (EF Core/SQLite, etc.)
+  PromptOps.Host            the daemon's composition root and entry point (ADR-0009)
+plugins/
+  PromptOps.Plugin.Sdk          IPromptOpsPlugin — the contract daemon-side provider plugins implement
+  PromptOps.Plugins.Sonar       IMetricCollector querying SonarQube/SonarCloud
+  PromptOps.Plugins.BuildResult IMetricCollector parsing pushed trx/Cobertura content
+tests/
+  PromptOps.Domain.Tests         unit tests for Domain
+  PromptOps.Architecture.Tests   NetArchTest fitness tests enforcing the layering rule below
+  PromptOps.Infrastructure.Tests integration tests against real SQLite (SqliteFixture)
+  PromptOps.Plugins.Tests        unit tests for the Sonar/BuildResult collectors
+  PromptOps.Host.Tests           integration tests against the Host (WebApplicationFactory) + plugin loading
+claude-plugin/
+  hooks/    SessionStart/PreToolUse/PostToolUse/SessionEnd — capture execution context automatically
+  skills/   /promptops init|rate|evaluate|recommend|history|setup — anything that needs a human
+```
 
-### WebFetch — BLOCKED
-WebFetch calls are denied entirely. The URL is extracted and you are told to use `ctx_fetch_and_index` instead.
-Instead use:
-- `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` to query the indexed content
+Dependencies point inward only: `Domain` ← `Application` ← `Infrastructure`/`Host`.
+`PromptOps.Architecture.Tests` fails the build if that's ever violated — see
+[`docs/architecture.md`](docs/architecture.md) ADR-0002.
 
-## REDIRECTED tools — use sandbox equivalents
+## Building and testing
 
-### Bash (>20 lines output)
-Bash is ONLY for: `git`, `mkdir`, `rm`, `mv`, `cd`, `ls`, `npm install`, `pip install`, and other short-output commands.
-For everything else, use:
-- `ctx_batch_execute(commands, queries)` — run multiple commands + search in ONE call
-- `ctx_execute(language: "shell", code: "...")` — run in sandbox, only stdout enters context
+Requires the .NET 10 SDK.
 
-### Read (for analysis)
-If you are reading a file to **Edit** it → Read is correct (Edit needs content in context).
-If you are reading to **analyze, explore, or summarize** → use `ctx_execute_file(path, language, code)` instead. Only your printed summary enters context. The raw file content stays in the sandbox.
+```
+dotnet build
+dotnet test
+```
 
-### Grep (large results)
-Grep results can flood context. Use `ctx_execute(language: "shell", code: "grep ...")` to run searches in sandbox. Only your printed summary enters context.
+Both run against every project in the solution; no external services required. Docker is only
+needed to run the daemon itself — see [`docs/daemon-setup.md`](docs/daemon-setup.md). After
+changing daemon/provider code, rebuild and restart the running container to pick it up:
 
-## Tool selection hierarchy
+```
+docker compose up -d --build
+```
 
-1. **GATHER**: `ctx_batch_execute(commands, queries)` — Primary tool. Runs all commands, auto-indexes output, returns search results. ONE call replaces 30+ individual calls.
-2. **FOLLOW-UP**: `ctx_search(queries: ["q1", "q2", ...])` — Query indexed content. Pass ALL questions as array in ONE call.
-3. **PROCESSING**: `ctx_execute(language, code)` | `ctx_execute_file(path, language, code)` — Sandbox execution. Only stdout enters context.
-4. **WEB**: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` — Fetch, chunk, index, query. Raw HTML never enters context.
-5. **INDEX**: `ctx_index(content, source)` — Store content in FTS5 knowledge base for later search.
+## Docs
 
-## Subagent routing
+- [`docs/architecture.md`](docs/architecture.md) — ADRs and design rationale.
+- [`docs/project-plan.md`](docs/project-plan.md) — phased implementation plan.
+- Every phase's own doc (`docs/*.md`) covers its domain model and testing approach in depth.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — project status and full contributor guide.
 
-When spawning subagents (Agent/Task tool), the routing block is automatically injected into their prompt. Bash-type subagents are upgraded to general-purpose so they have access to MCP tools. You do NOT need to manually instruct subagents about context-mode.
+## Git & PRs
 
-## Output constraints
-
-- Keep responses under 500 words.
-- Write artifacts (code, configs, PRDs) to FILES — never return them as inline text. Return only: file path + 1-line description.
-- When indexing content, use descriptive source labels so others can `ctx_search(source: "label")` later.
-
-## ctx commands
-
-| Command | Action |
-|---------|--------|
-| `ctx stats` | Call the `ctx_stats` MCP tool and display the full output verbatim |
-| `ctx doctor` | Call the `ctx_doctor` MCP tool, run the returned shell command, display as checklist |
-| `ctx upgrade` | Call the `ctx_upgrade` MCP tool, run the returned shell command, display as checklist |
+- Don't commit or push unless explicitly asked.
+- Work on a branch, never commit straight to `main`.

@@ -36,8 +36,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAIEvaluationRepository, AIEvaluationRepository>();
         services.AddScoped<IScoringConfigRepository, ScoringConfigRepository>();
         services.AddScoped<IPromptScoreRepository, PromptScoreRepository>();
-        services.AddSingleton<IAIExecutionProvider, ManualAIExecutionProvider>();
+        AddAIExecutionProvider(services, configuration);
         services.AddScoped<IAIEvaluationProvider, AIJudgeEvaluationProvider>();
+        services.AddSingleton<IPendingDelegatedEvaluationStore, InMemoryPendingDelegatedEvaluationStore>();
         services.AddScoped<IScoringProvider, WeightedSumScoringProvider>();
         services.AddScoped<IActivityClassifier, AIActivityClassifier>();
         // v1 stays registered as a concrete type (directly testable/usable on its own); v2 is the
@@ -66,5 +67,28 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDomainEventHandler<ExecutionRecorded>, AutoAIEvaluationTrigger>();
 
         return services;
+    }
+
+    /// <summary>
+    /// Selects the judge/execution AI backend via the "AIExecution:Provider" config key.
+    /// Defaults to "manual" (<see cref="ManualAIExecutionProvider"/>) so a fresh clone — and the
+    /// existing test suite, which drives judge responses through <c>parameters["output"]</c> —
+    /// behaves exactly as before. Set it to "claude-cli" to shell out to a real `claude` CLI
+    /// (see <see cref="ClaudeCliAIExecutionProvider"/>) for actual judge calls.
+    /// </summary>
+    private static void AddAIExecutionProvider(IServiceCollection services, IConfiguration configuration)
+    {
+        var provider = configuration["AIExecution:Provider"] ?? "manual";
+
+        if (string.Equals(provider, "claude-cli", StringComparison.OrdinalIgnoreCase))
+        {
+            services.Configure<ClaudeCliOptions>(configuration.GetSection("ClaudeCli"));
+            services.AddSingleton<IProcessRunner, ProcessRunner>();
+            services.AddSingleton<IAIExecutionProvider, ClaudeCliAIExecutionProvider>();
+        }
+        else
+        {
+            services.AddSingleton<IAIExecutionProvider, ManualAIExecutionProvider>();
+        }
     }
 }

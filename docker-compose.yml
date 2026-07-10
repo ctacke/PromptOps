@@ -13,12 +13,25 @@ services:
       - "127.0.0.1:5179:8080"
     volumes:
       - promptops-data:/data
+      # Own, writable Claude Code state for the container (session/cache files) — kept separate
+      # from the host's real ~/.claude so a headless judge run in here never mutates your actual
+      # interactive session history/config.
+      - promptops-claude-config:/app/.claude
+      # Only the credentials file is shared in from the host, read-only, so the CLI running in
+      # the container reuses your existing `claude` auth instead of needing its own API key.
+      - ${HOME}/.claude/.credentials.json:/app/.claude/.credentials.json:ro
     environment:
       # Unset by default — Sonar collection is skipped (not an error) until a daemon operator
       # configures these (docs/metrics.md). Set on the host shell before `docker compose up` to
       # point at a real (or, for scripts/metrics-smoke-test.ps1, fake) Sonar server.
       - Plugins__sonar__BaseUrl=${PROMPTOPS_SONAR_BASE_URL:-}
       - PROMPTOPS_SECRET_SONAR_TOKEN=${PROMPTOPS_SONAR_TOKEN:-}
+      # Opt-in real AI judge backend (docs/ai-evaluation.md): shells out to the `claude` CLI
+      # inside the container using the credentials mounted above, instead of the "manual"/echo
+      # test stub. Off by default so a fresh clone (and every test) keeps working with no host
+      # Claude Code auth mounted in. Set PROMPTOPS_AI_EXECUTION_PROVIDER=claude-cli to enable.
+      - AIExecution__Provider=${PROMPTOPS_AI_EXECUTION_PROVIDER:-manual}
 
 volumes:
   promptops-data:
+  promptops-claude-config:

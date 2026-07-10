@@ -130,6 +130,25 @@ Two additional extension points beyond the provider interfaces, needed for the r
 
 **Explicitly rejected:** shipping a compiled binary inside the plugin (rejected in ADR-0001 in favor of Docker); a per-repo container (rejected in §9 — it would forfeit cross-repo recommendations, the main reason the shared-daemon model was chosen).
 
+### ADR-0010: Client-Delegated AI Evaluation (MCP sampling is gone)
+
+**Context:** `IAIEvaluationProvider` (ADR-0003, Phase 7) is built on `IAIExecutionProvider` — a judge is "just another prompt execution." That assumed *something* would eventually call a real model on the daemon's behalf: MCP originally specified `sampling/createMessage`, letting a server ask the connected client to run a completion using whatever model/session the client already has. That's exactly the shape PromptOps needs — the daemon judging an execution shouldn't require its own separate AI credentials when it's being driven by a client (Claude Code, or any other MCP client) that already has an authenticated model conversation open. But sampling was deprecated from the MCP spec (SEP-2577) before any mainstream client — including Claude Code — implemented the client side of it. It cannot be built on.
+
+**Decision:** Add a second, additive way to run `IAIEvaluationProvider`'s judge logic — **client-delegated evaluation** — that gets the same effect via two ordinary MCP tool calls instead of a protocol-level sampling request:
+
+1. `prepare_ai_evaluation(executionId)` — the daemon builds the judge prompt (extracted from `AIJudgeEvaluationProvider` into shared, dependency-free `JudgePromptBuilder`/`JudgeResponseParser` helpers so both paths use identical prompt/schema logic) and returns it, tagged with a short-lived, single-use `correlationId`. It does **not** call any model.
+2. The calling agent — whatever MCP client is in the conversation — answers that prompt using its own current reasoning/model, exactly as it would answer any other request in the same session. No new credentials, no subprocess, no separate API key.
+3. `submit_ai_evaluation_result(correlationId, response)` — the daemon validates/parses the answer against the judge schema (same tolerant extraction + retry-with-correction loop `AIJudgeEvaluationProvider` already has, just restructured as request/response instead of an internal loop) and persists the resulting `AIEvaluation` exactly as `run_ai_evaluation` does today. A schema mismatch returns `retry_needed` with a correction prompt instead of throwing, so the client can just try again in the same turn.
+
+This is deliberately **transport-agnostic at the protocol level** — it's built entirely from ordinary MCP tool calls, not a new MCP capability — so it doesn't depend on Claude Code specifically or on any future sampling-equivalent landing. Any MCP client capable of (a) calling a tool, (b) reasoning over the returned text with its own model, (c) calling a tool back with the result satisfies the contract. `docs/ai-evaluation.md` has the full design (pending-evaluation lifetime, correlation-token handling, MCP tool contracts, the updated `/promptops evaluate` flow).
+
+**What this doesn't replace:** `IAIExecutionProvider`/`IAIEvaluationProvider`/`run_ai_evaluation` (daemon-owned, autonomous judging) stay exactly as they are. `AutoAIEvaluationTrigger` runs in a detached background task with no live client attached to delegate to — it has nothing to delegate *to*, so automatic/unattended evaluation still needs a daemon-owned `IAIExecutionProvider` (`ManualAIExecutionProvider` for tests; a real backend such as `ClaudeCliAIExecutionProvider`, shelling out to a locally-installed, locally-authenticated `claude` CLI, for real unattended use). Client delegation is the new *preferred* path specifically for the interactive `/promptops evaluate` case, where a live client session already exists — it doesn't need to become the only path.
+
+**Explicitly rejected:**
+- *Rebuilding on MCP sampling* — dead per SEP-2577; no mainstream client (including Claude Code) implements the client side.
+- *Requiring the daemon to hold its own provider-specific API keys as the default path* — technically simplest, but violates "never require users to duplicate credentials that already exist in their AI client if that can reasonably be avoided." Kept available (`IAIExecutionProvider` + `AIExecution:Provider` config, ADR-0003) as an opt-in/automatic-path backend, not the default interactive path.
+- *A new bespoke callback protocol (WebSocket push, long-poll) instead of two plain MCP tool calls* — unnecessary complexity for a flow that completes within one conversation turn; ordinary request/response tool calls are sufficient and keep the daemon's two surfaces (ADR-0006) unchanged.
+
 ## 3. Domain Model
 
 ```
