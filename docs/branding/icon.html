@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  .canvas {
+    width: 512px;
+    height: 512px;
+    position: relative;
+  }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0b0f1a"/>
+        <stop offset="100%" stop-color="#0d1420"/>
+      </linearGradient>
+      <radialGradient id="glow" cx="38%" cy="38%" r="65%">
+        <stop offset="0%" stop-color="#1a3a52" stop-opacity="0.55"/>
+        <stop offset="100%" stop-color="#0b0f1a" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="bubbleStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#38e0ff"/>
+        <stop offset="100%" stop-color="#2f8fff"/>
+      </linearGradient>
+      <linearGradient id="checkFill" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#34e39a"/>
+        <stop offset="100%" stop-color="#18b976"/>
+      </linearGradient>
+      <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="7" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+
+    <!-- background rounded-square -->
+    <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#bg)"/>
+    <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#glow)"/>
+
+    <!-- speech bubble: prompt -->
+    <path d="M 152 140
+             L 300 140
+             Q 344 140 344 184
+             L 344 268
+             Q 344 312 300 312
+             L 220 312
+             L 168 366
+             L 168 312
+             L 152 312
+             Q 108 312 108 268
+             L 108 184
+             Q 108 140 152 140 Z"
+          fill="none" stroke="url(#bubbleStroke)" stroke-width="17"
+          stroke-linejoin="round" stroke-linecap="round" filter="url(#softGlow)"/>
+
+    <!-- version node + connector -->
+    <circle cx="185" cy="205" r="15" fill="#0b0f1a" stroke="#38e0ff" stroke-width="10"/>
+    <path d="M 185 220 L 185 245 L 250 245" fill="none" stroke="#38e0ff" stroke-width="10" stroke-linecap="round"/>
+
+    <!-- checkmark badge: verified score -->
+    <circle cx="300" cy="300" r="52" fill="url(#checkFill)" filter="url(#softGlow)"/>
+    <path d="M 277 300 L 293 317 L 326 281" fill="none" stroke="#0b0f1a" stroke-width="12"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+</body>
+</html>

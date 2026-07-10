@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: 'sysmono'; src: local('Consolas'), local('Cascadia Code'), local('Courier New'); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .mono { font-family: ui-monospace, Consolas, "Cascadia Code", "Courier New", monospace; }
+
+  .banner {
+    width: 1280px;
+    height: 640px;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(120% 140% at 8% 0%, #142236 0%, #0a0e17 45%, #090c14 100%);
+    border-radius: 22px;
+  }
+
+  /* ---- circuit decoration ---- */
+  .circuit { position: absolute; opacity: 0.55; }
+  .circuit.tl { top: 0; left: 0; }
+  .circuit.br { bottom: 0; right: 0; transform: rotate(180deg); }
+
+  /* ---- left column ---- */
+  .left {
+    position: absolute;
+    left: 64px;
+    top: 0;
+    bottom: 0;
+    width: 560px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .mark-row { display: flex; align-items: center; gap: 26px; margin-bottom: 30px; }
+
+  .wordmark {
+    font-size: 68px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #f2f5fa;
+    line-height: 1;
+  }
+  .wordmark .accent {
+    background: linear-gradient(90deg, #38e0ff, #4f8bff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .tagline {
+    margin: 4px 0 18px;
+    font-size: 21px;
+    color: #93a0b8;
+    font-family: ui-monospace, Consolas, "Cascadia Code", monospace;
+    letter-spacing: 0.01em;
+  }
+
+  .cadence { font-size: 22px; font-weight: 700; font-family: ui-monospace, Consolas, monospace; letter-spacing: 0.01em; }
+  .cadence .c1 { color: #38e0ff; }
+  .cadence .c2 { color: #5aa8ff; }
+  .cadence .c3 { color: #34e39a; }
+  .cadence .c4 { color: #f5a623; }
+  .cadence .dot { color: #4a5570; margin: 0 12px; }
+
+  .badges { display: flex; gap: 14px; margin-top: 48px; }
+  .badge {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    padding: 10px 16px;
+  }
+  .badge .dot-ring {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid var(--c);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--c);
+  }
+  .badge .label { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #cfd6e4; font-family: ui-monospace, Consolas, monospace; }
+  .badge .sub { font-size: 11px; color: #6c7890; }
+
+  /* ---- right column: pipeline ---- */
+  .right {
+    position: absolute;
+    right: 60px;
+    top: 0;
+    bottom: 0;
+    width: 560px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .stage-list { position: relative; padding-left: 34px; }
+  .stage-list::before {
+    content: "";
+    position: absolute;
+    left: 13px; top: 8px; bottom: 8px;
+    width: 2px;
+    background: linear-gradient(180deg, #38e0ff, #5aa8ff 30%, #34e39a 55%, #f5a623 78%, #a78bfa 100%);
+    opacity: 0.55;
+  }
+
+  .stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  .stage:last-child { margin-bottom: 0; }
+
+  .node {
+    position: absolute;
+    left: -34px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 10px var(--c);
+  }
+
+  .chip {
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--c1), var(--c2));
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+    box-shadow: 0 0 18px -4px var(--c1);
+  }
+  .chip svg { width: 24px; height: 24px; }
+
+  .stage-text { flex: 1; }
+  .stage-title { font-size: 15px; font-weight: 800; letter-spacing: 0.06em; color: #eef1f7; font-family: ui-monospace, Consolas, monospace; }
+  .stage-desc { font-size: 13px; color: #8a93a8; margin-top: 2px; }
+
+  .stat {
+    flex: none;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    min-width: 78px;
+    text-align: center;
+  }
+  .stat .num { font-size: 18px; font-weight: 800; color: #eef1f7; font-family: ui-monospace, Consolas, monospace; }
+  .stat .num .of100 { font-size: 10px; color: #6c7890; font-weight: 600; }
+  .stat.deployed { color: #34e39a; font-size: 12px; font-weight: 700; font-family: ui-monospace, Consolas, monospace; }
+  .stat.deployed .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#34e39a; margin-right:6px; box-shadow: 0 0 6px #34e39a; }
+</style>
+</head>
+<body>
+<div class="banner">
+
+  <!-- corner circuit decoration -->
+  <svg class="circuit tl" width="260" height="200" viewBox="0 0 260 200" fill="none">
+    <path d="M0 40 H70 L100 70 V130" stroke="#2a3b55" stroke-width="1.5"/>
+    <path d="M0 90 H40" stroke="#2a3b55" stroke-width="1.5"/>
+    <path d="M60 0 V30 L90 60" stroke="#2a3b55" stroke-width="1.5"/>
+    <circle cx="70" cy="40" r="3.5" fill="#38e0ff"/>
+    <circle cx="100" cy="70" r="3.5" fill="#5aa8ff"/>
+    <circle cx="40" cy="90" r="3" fill="#3a4a68"/>
+    <circle cx="90" cy="60" r="3" fill="#3a4a68"/>
+  </svg>
+  <svg class="circuit br" width="300" height="220" viewBox="0 0 300 220" fill="none">
+    <path d="M0 40 H90 L130 80 V150" stroke="#2a3b55" stroke-width="1.5"/>
+    <path d="M40 0 V30 L80 70" stroke="#2a3b55" stroke-width="1.5"/>
+    <circle cx="90" cy="40" r="3.5" fill="#a78bfa"/>
+    <circle cx="130" cy="80" r="3" fill="#3a4a68"/>
+    <circle cx="80" cy="70" r="3" fill="#3a4a68"/>
+  </svg>
+
+  <div class="left">
+    <div class="mark-row">
+      <svg width="86" height="86" viewBox="0 0 512 512">
+        <defs>
+          <linearGradient id="bs" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#38e0ff"/><stop offset="100%" stop-color="#2f8fff"/>
+          </linearGradient>
+          <linearGradient id="cf" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#34e39a"/><stop offset="100%" stop-color="#18b976"/>
+          </linearGradient>
+        </defs>
+        <path d="M 152 140 L 300 140 Q 344 140 344 184 L 344 268 Q 344 312 300 312 L 220 312 L 168 366 L 168 312 L 152 312 Q 108 312 108 268 L 108 184 Q 108 140 152 140 Z"
+              fill="none" stroke="url(#bs)" stroke-width="19" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="185" cy="205" r="15" fill="#0b0f1a" stroke="#38e0ff" stroke-width="11"/>
+        <path d="M 185 220 L 185 245 L 250 245" fill="none" stroke="#38e0ff" stroke-width="11" stroke-linecap="round"/>
+        <circle cx="300" cy="300" r="54" fill="url(#cf)"/>
+        <path d="M 277 300 L 293 317 L 326 281" fill="none" stroke="#0b0f1a" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <div class="wordmark">Prompt<span class="accent">Ops</span></div>
+      </div>
+    </div>
+
+    <div class="tagline">Prompt engineering, measured.</div>
+    <div class="cadence">
+      <span class="c1">Version</span><span class="dot">&bull;</span><span class="c2">Evaluate</span><span class="dot">&bull;</span><span class="c3">Score</span><span class="dot">&bull;</span><span class="c4">Recommend</span>
+    </div>
+
+    <div class="badges">
+      <div class="badge">
+        <div class="dot-ring" style="--c:#5aa8ff">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </div>
+        <div>
+          <div class="label">DOCKER</div>
+          <div class="sub">Local daemon</div>
+        </div>
+      </div>
+      <div class="badge">
+        <div class="dot-ring" style="--c:#34e39a">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+        </div>
+        <div>
+          <div class="label">MCP</div>
+          <div class="sub">Agent tools</div>
+        </div>
+      </div>
+      <div class="badge">
+        <div class="dot-ring" style="--c:#f5a623">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 17l6-10 6 10M8 13h4"/></svg>
+        </div>
+        <div>
+          <div class="label">CLAUDE CODE</div>
+          <div class="sub">Per-repo plugin</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="stage-list">
+
+      <div class="stage">
+        <div class="node" style="--c:#38e0ff"></div>
+        <div class="chip" style="--c1:#38e0ff; --c2:#2f8fff">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="stage-text">
+          <div class="stage-title">PROMPT</div>
+          <div class="stage-desc">Create &amp; version prompts</div>
+        </div>
+        <div class="stat"><div class="num">v3</div></div>
+      </div>
+
+      <div class="stage">
+        <div class="node" style="--c:#5aa8ff"></div>
+        <div class="chip" style="--c1:#5aa8ff; --c2:#4f6bff">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z" fill="white" stroke="none"/></svg>
+        </div>
+        <div class="stage-text">
+          <div class="stage-title">EXECUTE</div>
+          <div class="stage-desc">Track every session, any repo</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="node" style="--c:#34d0c0"></div>
+        <div class="chip" style="--c1:#34d0c0; --c2:#22b8ac">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <div class="stage-text">
+          <div class="stage-title">EVALUATE</div>
+          <div class="stage-desc">Human judgment + AI review</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="node" style="--c:#34e39a"></div>
+        <div class="chip" style="--c1:#34e39a; --c2:#18b976">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        </div>
+        <div class="stage-text">
+          <div class="stage-title">SCORE</div>
+          <div class="stage-desc">Weighted, reproducible</div>
+        </div>
+        <div class="stat"><span class="num">92<span class="of100">/100</span></span></div>
+      </div>
+
+      <div class="stage">
+        <div class="node" style="--c:#f5a623"></div>
+        <div class="chip" style="--c1:#f5a623; --c2:#e8871a">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="white"/></svg>
+        </div>
+        <div class="stage-text">
+          <div class="stage-title">RECOMMEND</div>
+          <div class="stage-desc">Best version, across all your repos</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="node" style="--c:#a78bfa"></div>
+        <div class="chip" style="--c1:#a78bfa; --c2:#8b5cf6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2c3 3 4 6 4 10 0 2-1 4-4 8-3-4-4-6-4-8 0-4 1-7 4-10z"/><path d="M8 15l-3 3M16 15l3 3"/></svg>
+        </div>
+        <div class="stage-text">
+          <div class="stage-title">PROMOTE</div>
+          <div class="stage-desc">Manual sign-off, or automatic</div>
+        </div>
+        <div class="stat deployed"><span class="dot"></span>Active</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

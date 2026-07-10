@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/branding/banner.png" alt="PromptOps — Version, Evaluate, Score, Recommend" width="100%">
+</p>
+
 # PromptOps
 
 Prompt versioning, evaluation, and continuous improvement for AI-assisted development.
@@ -14,58 +18,33 @@ PromptOps treats prompts as versioned engineering assets and measures their effe
 
 **It is** an engineering telemetry platform for AI-assisted development: versioned prompts, a record of every execution and the context around it, objective engineering metrics, human and AI evaluation, and a scoring/recommendation engine that surfaces which prompt version to reach for next.
 
-**It is not** a prompt library or snippet manager — saving and tagging prompt text is a small part of it, not the point. **It also does not (yet) rewrite prompts for you** — today it measures and recommends; a human decides what to change. Automatic prompt refinement is on the roadmap, not something built into the first phases.
+**It is not** a prompt library or snippet manager — saving and tagging prompt text is a small part of it, not the point. **It also does not (yet) rewrite prompts for you** — today it measures and recommends; a human decides what to change, unless you opt into automatic promotion (see [`docs/promotion-policy.md`](docs/promotion-policy.md)).
+
+Concretely, it:
+
+- Versions prompts and tracks their evolution over time
+- Records every prompt execution along with the development context around it (repo, branch, commit, task, referenced docs/ADRs, acceptance criteria)
+- Automatically collects objective engineering metrics (build, test, coverage, static analysis, review activity) where possible
+- Captures structured human evaluation and AI-judged evaluation, kept separate from each other
+- Scores prompt effectiveness from configurable, weighted combinations of the above
+- Recommends the best-performing prompt for a given kind of task, drawing on history across all of a developer's projects
+- Supports multiple AI providers (Claude Code today; ChatGPT, Copilot, local models by design, not by hardcoding)
 
 ## How it works
 
 PromptOps runs as a small local daemon (Docker) on your machine — started once, not per project — that owns your prompt history and evaluation data. Each repository gets a thin Claude Code plugin: hooks that capture context and execution data automatically, and slash commands (`/promptops init`, `/promptops rate`, `/promptops evaluate`, `/promptops recommend`, `/promptops history`) for anything that needs a human. Because every repo talks to the same local daemon, a recommendation on a brand-new project can draw on history from every other project on your machine — nothing is siloed per repo, and nothing leaves your machine.
 
-Want to start using it with an existing project? [`docs/getting-started.md`](docs/getting-started.md) is the practical walkthrough. See [`docs/architecture.md`](docs/architecture.md) for the full architecture and design rationale, and [`docs/project-plan.md`](docs/project-plan.md) for the phased implementation plan.
+For a stage-by-stage walkthrough of what happens from the moment you type a task to the moment a better prompt gets recommended next time, see **[`docs/promptops-flow.html`](docs/promptops-flow.html)** (open it locally in a browser, or download it via GitHub's "raw" view — GitHub doesn't render `.html` files inline).
 
-## Goals
+## Get started
 
-- Version prompts and track their evolution over time
-- Record every prompt execution along with the development context around it (repo, branch, commit, task, referenced docs/ADRs, acceptance criteria)
-- Automatically collect objective engineering metrics (build, test, coverage, static analysis, review activity) where possible
-- Capture structured human evaluation and AI-judged evaluation, kept separate from each other
-- Score prompt effectiveness from configurable, weighted combinations of the above
-- Recommend the best-performing prompt for a given kind of task, drawing on history across all of a developer's projects
-- Support multiple AI providers (Claude Code today; ChatGPT, Copilot, local models by design, not by hardcoding)
+1. **[`docs/getting-started.md`](docs/getting-started.md)** — the practical, step-by-step walkthrough: start the daemon, install the plugin into an existing project, seed some starter prompts, and use it. Start here.
+2. **[`docs/daemon-setup.md`](docs/daemon-setup.md)** — the one-time daemon setup in more detail (Docker, data persistence, upgrades, metric-collector plugins).
+3. **[`docs/installing-promptops.md`](docs/installing-promptops.md)** — the per-repo Claude Code plugin in more detail (hooks, skills, what each one does).
 
-## Status
+## Learn more
 
-Phase 0 (architecture decision + project plan), Phase 1 (domain core + solution skeleton), Phase 2 (prompt repository — EF Core/SQLite persistence, see [`docs/prompt-repository.md`](docs/prompt-repository.md)), Phase 3 (execution tracking — see [`docs/execution-tracking.md`](docs/execution-tracking.md)), Phase 4a (Docker daemon packaging + MCP-over-HTTP — see [`docs/daemon-setup.md`](docs/daemon-setup.md)), Phase 4b (the per-repo Claude Code plugin — see [`docs/installing-promptops.md`](docs/installing-promptops.md)), Phase 5 (engineering metric collectors — Sonar + build/test results, real plugin loading — see [`docs/metrics.md`](docs/metrics.md)), Phase 6 (human evaluation — `/promptops rate`, see [`docs/human-evaluation.md`](docs/human-evaluation.md)), Phase 7 (AI evaluation pipeline — schema-validated judge output with retry, see [`docs/ai-evaluation.md`](docs/ai-evaluation.md)), Phase 8 (scoring engine — weighted-sum `PromptScore` with debounced recompute-on-event, see [`docs/scoring.md`](docs/scoring.md)), Phase 9 (recommendation engine v1 — classify-then-recommend, tag + historical ranking across every repo, `/promptops recommend`, see [`docs/recommendations.md`](docs/recommendations.md)), Phase 10 (semantic search / knowledge base — embedding index, recommendation engine v2 blending semantic + tag + historical ranking, see [`docs/knowledge-base.md`](docs/knowledge-base.md)), and Phase 11 (optional human evaluation / automatic prompt promotion — manual and score-driven `PromptVersion` activation, see [`docs/promotion-policy.md`](docs/promotion-policy.md)) are complete. Each subsequent phase ships working software and is reviewed before the next begins — see [`docs/project-plan.md`](docs/project-plan.md) for the current phase breakdown.
-
-## Solution layout
-
-```
-PromptOps.slnx
-src/
-  PromptOps.Domain          entities/value objects, zero dependencies (ADR-0002)
-  PromptOps.Application     use cases, provider interfaces/ports (ADR-0003), depends only on Domain
-  PromptOps.Infrastructure  default implementations of Application's ports (EF Core/SQLite, etc.)
-  PromptOps.Host            the daemon's composition root and entry point (ADR-0009)
-plugins/
-  PromptOps.Plugin.Sdk         IPromptOpsPlugin — the contract daemon-side provider plugins implement
-  PromptOps.Plugins.Sonar      IMetricCollector querying SonarQube/SonarCloud (Phase 5)
-  PromptOps.Plugins.BuildResult IMetricCollector parsing pushed trx/Cobertura content (Phase 5)
-tests/
-  PromptOps.Domain.Tests         unit tests for Domain
-  PromptOps.Architecture.Tests   NetArchTest fitness tests enforcing the layering rule above
-  PromptOps.Infrastructure.Tests integration tests against real SQLite (SqliteFixture)
-  PromptOps.Plugins.Tests        unit tests for the Sonar/BuildResult collectors
-  PromptOps.Host.Tests           integration tests against the Host (WebApplicationFactory) + plugin loading
-```
-
-Dependencies point inward only: `Domain` ← `Application` ← `Infrastructure`/`Host`. `PromptOps.Architecture.Tests` fails the build if that's ever violated — see [`docs/architecture.md`](docs/architecture.md) ADR-0002.
-
-## Building and testing
-
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
-
-```
-dotnet build
-dotnet test
-```
-
-Both run against every project in the solution; no external services (no database, no Docker) are required yet — that starts changing from Phase 2 onward.
+- **[`docs/architecture.md`](docs/architecture.md)** — architecture decisions (ADRs) and full design rationale.
+- **[`docs/project-plan.md`](docs/project-plan.md)** — the phased build-out, including what's still on the roadmap.
+- Every capability has its own doc, each covering its domain model and design decisions in depth: [prompt repository](docs/prompt-repository.md) · [execution tracking](docs/execution-tracking.md) · [engineering metrics](docs/metrics.md) · [plugin authoring](docs/plugin-authoring.md) · [human evaluation](docs/human-evaluation.md) · [AI evaluation](docs/ai-evaluation.md) · [scoring](docs/scoring.md) · [recommendations](docs/recommendations.md) · [semantic search / knowledge base](docs/knowledge-base.md) · [promotion policy](docs/promotion-policy.md)
+- **[`CONTRIBUTING.md`](CONTRIBUTING.md)** — working on PromptOps itself: project status, solution layout, building and testing.
