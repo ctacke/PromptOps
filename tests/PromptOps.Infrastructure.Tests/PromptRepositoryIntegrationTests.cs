@@ -167,4 +167,85 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
         await Assert.ThrowsAsync<PromptVersionNotFoundException>(
             () => service.DeprecatePromptVersionAsync(prompt.Id, Guid.NewGuid()));
     }
+
+    [Fact]
+    public async Task ActivateVersion_persists_the_status_change_and_deprecates_the_prior_active_version()
+    {
+        Guid promptId;
+        Guid v1Id;
+        Guid v2Id;
+        using (var context = fixture.CreateContext())
+        {
+            var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
+            var prompt = await service.CreatePromptAsync("Fix a bug");
+            promptId = prompt.Id;
+            var v1 = await service.CreateVersionAsync(promptId, "first", "alice");
+            v1Id = v1.Id;
+            var v2 = await service.CreateVersionAsync(promptId, "second", "alice");
+            v2Id = v2.Id;
+
+            await service.ActivateVersionAsync(promptId, v1Id);
+            await service.ActivateVersionAsync(promptId, v2Id);
+        }
+
+        using var freshContext = fixture.CreateContext();
+        var reloaded = await new PromptRepository(freshContext).GetByIdAsync(promptId);
+
+        Assert.Equal(PromptVersionStatus.Deprecated, reloaded!.Versions.Single(v => v.Id == v1Id).Status);
+        Assert.Equal(PromptVersionStatus.Active, reloaded.Versions.Single(v => v.Id == v2Id).Status);
+    }
+
+    [Fact]
+    public async Task GetByVersionIdAsync_loads_the_owning_prompt_with_all_of_its_versions()
+    {
+        Guid promptId;
+        Guid v1Id;
+        Guid v2Id;
+        using (var context = fixture.CreateContext())
+        {
+            var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
+            var prompt = await service.CreatePromptAsync("Fix a bug");
+            promptId = prompt.Id;
+            v1Id = (await service.CreateVersionAsync(promptId, "first", "alice")).Id;
+            v2Id = (await service.CreateVersionAsync(promptId, "second", "alice")).Id;
+        }
+
+        using var freshContext = fixture.CreateContext();
+        var reloaded = await new PromptRepository(freshContext).GetByVersionIdAsync(v2Id);
+
+        Assert.NotNull(reloaded);
+        Assert.Equal(promptId, reloaded!.Id);
+        Assert.Equal(2, reloaded.Versions.Count);
+        Assert.Contains(reloaded.Versions, v => v.Id == v1Id);
+    }
+
+    [Fact]
+    public async Task GetByVersionIdAsync_returns_null_for_an_unknown_version()
+    {
+        using var context = fixture.CreateContext();
+
+        var result = await new PromptRepository(context).GetByVersionIdAsync(Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetAllNamesAsync_returns_every_prompts_id_and_name()
+    {
+        // This class shares one SQLite file across every [Fact] (SqliteFixture), so — same as
+        // every other test in this file — assert by containment, not by exact count.
+        Guid promptId;
+        var uniqueName = $"Unique Prompt {Guid.NewGuid():N}";
+        using (var context = fixture.CreateContext())
+        {
+            var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
+            var prompt = await service.CreatePromptAsync(uniqueName);
+            promptId = prompt.Id;
+        }
+
+        using var freshContext = fixture.CreateContext();
+        var summaries = await new PromptRepository(freshContext).GetAllNamesAsync();
+
+        Assert.Contains(summaries, s => s.Id == promptId && s.Name == uniqueName);
+    }
 }

@@ -3,6 +3,7 @@ using PromptOps.Application.Evaluations;
 using PromptOps.Application.Events;
 using PromptOps.Application.Executions;
 using PromptOps.Application.Metrics;
+using PromptOps.Application.Promotion;
 using PromptOps.Application.Prompts;
 using PromptOps.Application.Recommendations;
 using PromptOps.Application.Scoring;
@@ -20,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AIEvaluationService>();
         services.AddScoped<ScoringService>();
         services.AddScoped<RecommendationService>();
+        services.AddScoped<PromotionPolicyService>();
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         return services;
     }

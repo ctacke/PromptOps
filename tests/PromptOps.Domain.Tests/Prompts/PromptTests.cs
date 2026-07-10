@@ -152,4 +152,62 @@ public class PromptTests
         Assert.Equal(metadata, prompt.Metadata);
         Assert.Single(prompt.Versions);
     }
+
+    [Fact]
+    public void ActivateVersion_Activates_A_Draft_Version_When_No_Other_Version_Is_Active()
+    {
+        var prompt = Prompt.Create("Fix a bug");
+        var v1 = prompt.CreateVersion("first draft", "alice");
+
+        prompt.ActivateVersion(v1.Id);
+
+        Assert.Equal(PromptVersionStatus.Active, v1.Status);
+    }
+
+    [Fact]
+    public void ActivateVersion_Deprecates_The_Previously_Active_Version()
+    {
+        var prompt = Prompt.Create("Fix a bug");
+        var v1 = prompt.CreateVersion("first draft", "alice");
+        var v2 = prompt.CreateVersion("second draft", "alice");
+        prompt.ActivateVersion(v1.Id);
+
+        prompt.ActivateVersion(v2.Id);
+
+        Assert.Equal(PromptVersionStatus.Deprecated, v1.Status);
+        Assert.Equal(PromptVersionStatus.Active, v2.Status);
+    }
+
+    [Fact]
+    public void ActivateVersion_Re_Activating_The_Already_Active_Version_Is_A_No_Op()
+    {
+        var prompt = Prompt.Create("Fix a bug");
+        var v1 = prompt.CreateVersion("first draft", "alice");
+        prompt.ActivateVersion(v1.Id);
+
+        prompt.ActivateVersion(v1.Id);
+
+        Assert.Equal(PromptVersionStatus.Active, v1.Status);
+    }
+
+    [Fact]
+    public void ActivateVersion_Throws_For_An_Unknown_Version_Id()
+    {
+        var prompt = Prompt.Create("Fix a bug");
+        prompt.CreateVersion("first draft", "alice");
+
+        Assert.Throws<InvalidOperationException>(() => prompt.ActivateVersion(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ActivateVersion_Cannot_Resurrect_A_Deprecated_Version()
+    {
+        var prompt = Prompt.Create("Fix a bug");
+        var v1 = prompt.CreateVersion("first draft", "alice");
+        var v2 = prompt.CreateVersion("second draft", "alice");
+        prompt.ActivateVersion(v1.Id);
+        prompt.ActivateVersion(v2.Id); // deprecates v1
+
+        Assert.Throws<InvalidOperationException>(() => prompt.ActivateVersion(v1.Id));
+    }
 }

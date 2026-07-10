@@ -487,18 +487,19 @@
   <div class="pipeline">
     <ol class="stages">
 
-      <li class="stage" data-status="mixed">
+      <li class="stage" data-status="live">
         <div class="stage-marker">01</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>Pick — or get recommended — a prompt</h2>
-            <span class="status-tag mixed">manual: live · auto: planned</span>
+            <span class="status-tag live">live</span>
           </div>
-          <p class="stage-actor">Actor: <b>you</b>, or eventually <b>IActivityClassifier + IRecommendationProvider</b></p>
+          <p class="stage-actor">Actor: <b>you</b>, or <span class="mono">/promptops recommend</span> via <b>IActivityClassifier + IRecommendationProvider</b></p>
           <p class="stage-desc">
-            You write &ldquo;implement feature X&rdquo; as a new <span class="mono">PromptVersion</span> — or,
-            once the recommendation engine exists, paste it as a task description and let the daemon classify
-            it into activity tags and rank your best-performing prior versions for tasks like it.
+            You write &ldquo;implement feature X&rdquo; as a new <span class="mono">PromptVersion</span> — or
+            paste it as a task description via <span class="mono">/promptops recommend</span> and let the daemon
+            classify it into activity tags and rank your best-performing prior versions for tasks like it, blending
+            semantic similarity, tag overlap, and historical score.
           </p>
           <div class="artifacts">
             <span class="label">produces</span>
@@ -509,12 +510,12 @@
         </div>
       </li>
 
-      <li class="stage" data-status="mixed">
+      <li class="stage" data-status="live">
         <div class="stage-marker">02</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>Claude Code session starts</h2>
-            <span class="status-tag mixed">engine live · hook planned</span>
+            <span class="status-tag live">live</span>
           </div>
           <p class="stage-actor">Actor: <b>SessionStart hook</b> (thin, per-repo plugin)</p>
           <p class="stage-desc">
@@ -548,12 +549,12 @@
         </div>
       </li>
 
-      <li class="stage" data-status="mixed">
+      <li class="stage" data-status="live">
         <div class="stage-marker">04</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>Session ends</h2>
-            <span class="status-tag mixed">engine live · hook planned</span>
+            <span class="status-tag live">live</span>
           </div>
           <p class="stage-actor">Actor: <b>Stop hook</b></p>
           <p class="stage-desc">
@@ -569,12 +570,12 @@
         </div>
       </li>
 
-      <li class="stage" data-status="planned">
+      <li class="stage" data-status="live">
         <div class="stage-marker">05</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>Engineering signal arrives</h2>
-            <span class="status-tag">planned — phase 5</span>
+            <span class="status-tag live">live</span>
           </div>
           <p class="stage-actor">Actor: <b>IMetricCollector</b> plugins (Sonar, build/test)</p>
           <p class="stage-desc">
@@ -588,12 +589,12 @@
         </div>
       </li>
 
-      <li class="stage" data-status="planned">
+      <li class="stage" data-status="live">
         <div class="stage-marker">06</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>You rate it — optional</h2>
-            <span class="status-tag">planned — phase 6</span>
+            <span class="status-tag live">live</span>
           </div>
           <p class="stage-actor">Actor: <b>you</b>, via <span class="mono">/promptops rate</span></p>
           <p class="stage-desc">
@@ -607,12 +608,12 @@
         </div>
       </li>
 
-      <li class="stage" data-status="planned">
+      <li class="stage" data-status="live">
         <div class="stage-marker">07</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>The model judges it too</h2>
-            <span class="status-tag">planned — phase 7</span>
+            <span class="status-tag live">live</span>
           </div>
           <p class="stage-actor">Actor: <b>IAIEvaluationProvider</b></p>
           <p class="stage-desc">
@@ -627,12 +628,12 @@
         </div>
       </li>
 
-      <li class="stage" data-status="planned">
+      <li class="stage" data-status="live">
         <div class="stage-marker">08</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>Everything folds into one score</h2>
-            <span class="status-tag">planned — phase 8</span>
+            <span class="status-tag live">live</span>
           </div>
           <p class="stage-actor">Actor: <b>IScoringProvider</b></p>
           <p class="stage-desc">
@@ -647,22 +648,46 @@
         </div>
       </li>
 
-      <li class="stage" data-status="planned">
+      <li class="stage" data-status="live">
         <div class="stage-marker">09</div>
         <div class="stage-card">
           <div class="stage-head">
             <h2>It joins the pool every future task draws on</h2>
-            <span class="status-tag">planned — phase 9–10</span>
+            <span class="status-tag live">live</span>
           </div>
-          <p class="stage-actor">Actor: <b>IRecommendationProvider</b></p>
+          <p class="stage-actor">Actor: <b>IRecommendationProvider</b> (semantic + tag + historical blend)</p>
           <p class="stage-desc">
             This execution, its score, and its tags become part of one shared database — not per-repo, not
-            per-project, per <em>machine</em>. The next time you or a teammate starts something tagged
-            similarly, in this repo or a completely different one, this is what gets surfaced.
+            per-project, per <em>machine</em>. The next time you or a teammate starts something tagged or
+            <em>worded</em> similarly, in this repo or a completely different one, this is what gets surfaced —
+            even without exact tag overlap, since the embedding index catches what tag matching alone would miss.
           </p>
           <div class="artifacts">
             <span class="label">draws on</span>
             <span class="chip query-time">Recommendation · query-time only</span>
+            <span class="chip">Embedding</span>
+          </div>
+        </div>
+      </li>
+
+      <li class="stage" data-status="live">
+        <div class="stage-marker">10</div>
+        <div class="stage-card">
+          <div class="stage-head">
+            <h2>It can promote itself — optional</h2>
+            <span class="status-tag live">live</span>
+          </div>
+          <p class="stage-actor">Actor: <b>AutoPromotionTrigger</b>, or <b>you</b> via <span class="mono">POST /prompts/…/activate</span></p>
+          <p class="stage-desc">
+            By default a human still decides which <span class="mono">PromptVersion</span> counts as the
+            official one — there's now a manual endpoint for that. Flip a policy toggle instead, and once a
+            version's score clears a threshold — or beats the currently active version by a margin — the daemon
+            activates it itself. No <span class="mono">/promptops rate</span>, no sign-off required.
+          </p>
+          <div class="artifacts">
+            <span class="label">produces</span>
+            <span class="chip">PromptVersion · Active</span>
+            <span class="chip">PromotionPolicy</span>
           </div>
         </div>
       </li>
@@ -678,7 +703,8 @@
       <p>
         Next week, &ldquo;implement feature Y&rdquo; goes back through <b>stage 01</b> — except now it gets
         classified and ranked against every scored <span class="mono">PromptVersion</span> on this machine,
-        feature X's included.
+        feature X's included, and if it scored well enough it may already be the active version without anyone
+        having promoted it by hand.
       </p>
     </div>
   </div>
@@ -716,11 +742,13 @@
           <tr><td>PromptMetadata</td><td>Tags, categories, owners — stored separately, queryable without touching content</td><td><span class="pill live">live</span></td></tr>
           <tr><td>ExecutionRecord</td><td>One attempt: context, inputs, output, diff stats, timing, model</td><td><span class="pill live">live</span></td></tr>
           <tr><td>ExecutionToolUsage</td><td>One row per tool call made during the session</td><td><span class="pill live">live</span></td></tr>
-          <tr><td>EngineeringMetrics</td><td>Build, test, coverage, static-analysis results for an execution</td><td><span class="pill planned">planned</span></td></tr>
-          <tr><td>HumanEvaluation</td><td>Your structured rating of an execution</td><td><span class="pill planned">planned</span></td></tr>
-          <tr><td>AIEvaluation</td><td>The model's judgment of the same execution, kept separate from yours</td><td><span class="pill planned">planned</span></td></tr>
-          <tr><td>PromptScore</td><td>Weighted combination of the above, attached to a PromptVersion</td><td><span class="pill planned">planned</span></td></tr>
-          <tr><td>Recommendation</td><td>Ranked prompt versions for a new task — computed at query time, not stored</td><td><span class="pill planned">planned</span></td></tr>
+          <tr><td>EngineeringMetrics</td><td>Build, test, coverage, static-analysis results for an execution</td><td><span class="pill live">live</span></td></tr>
+          <tr><td>HumanEvaluation</td><td>Your structured rating of an execution</td><td><span class="pill live">live</span></td></tr>
+          <tr><td>AIEvaluation</td><td>The model's judgment of the same execution, kept separate from yours</td><td><span class="pill live">live</span></td></tr>
+          <tr><td>PromptScore</td><td>Weighted combination of the above, attached to a PromptVersion</td><td><span class="pill live">live</span></td></tr>
+          <tr><td>Embedding</td><td>Vector for a PromptVersion's name, tags, and content — powers semantic recommendation matching</td><td><span class="pill live">live</span></td></tr>
+          <tr><td>Recommendation</td><td>Ranked prompt versions for a new task — computed at query time, not stored</td><td><span class="pill live">live</span></td></tr>
+          <tr><td>PromotionPolicy</td><td>Global toggle + threshold/margin controlling whether scores can auto-activate a PromptVersion</td><td><span class="pill live">live</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -728,8 +756,10 @@
 
   <footer>
     Everything above lives in one SQLite database owned by a single local daemon that runs once per developer
-    machine — nothing here is sent anywhere else. See <code>docs/architecture.md</code> for the full design and
-    <code>docs/project-plan.md</code> for what's scheduled in which phase.
+    machine — nothing here is sent anywhere else. See <code>docs/architecture.md</code> for the full design,
+    <code>docs/project-plan.md</code> for what's scheduled in which phase, and
+    <code>docs/knowledge-base.md</code> / <code>docs/promotion-policy.md</code> for the semantic recommendation
+    index and auto-promotion policy specifically.
   </footer>
 
 </div>

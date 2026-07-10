@@ -16,11 +16,14 @@ internal sealed class FakePromptRepository : IPromptRepository
 
     public Task AddAsync(Prompt prompt, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<Prompt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<Prompt?> GetByVersionIdAsync(Guid versionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task UpdateAsync(Prompt prompt, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<PromptMetadataView?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task<IReadOnlyList<PromptRecommendationCandidate>> GetRecommendationCandidatesAsync(CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<PromptRecommendationCandidate>>(_candidates);
+
+    public Task<IReadOnlyList<PromptSummary>> GetAllNamesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

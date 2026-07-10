@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Fix a Bug",
+    "description": "Investigate and resolve a reported defect with a minimal, targeted change.",
+    "tags": ["debugging"],
+    "content": "Investigate the reported bug: reproduce it if possible, identify the root cause (not just the symptom), and fix it with the smallest change that correctly addresses the cause. Add or update a test that would have caught this bug. Note any related issues you noticed but didn't fix, rather than silently expanding scope."
+  },
+  {
+    "name": "Add a Feature",
+    "description": "Implement a new, well-scoped feature end-to-end.",
+    "tags": ["code-authoring"],
+    "content": "Implement the described feature end-to-end: the core logic, any necessary tests, and documentation updates if user-facing behavior changed. Follow existing patterns and conventions in the codebase rather than introducing new ones. Ask before making an architectural decision the codebase doesn't already establish a precedent for."
+  },
+  {
+    "name": "Write Tests",
+    "description": "Add test coverage for existing, currently under-tested code.",
+    "tags": ["testing"],
+    "content": "Write tests for the specified code: cover the primary success path, meaningful edge cases, and error conditions. Match the existing test framework, naming, and assertion style already used in this codebase. Don't test implementation details that would make the tests brittle to harmless refactors."
+  },
+  {
+    "name": "Refactor Code",
+    "description": "Improve the structure of existing code without changing its behavior.",
+    "tags": ["refactoring"],
+    "content": "Refactor the specified code to improve its structure — naming, duplication, complexity — without changing its observable behavior. Run existing tests before and after to confirm behavior is unchanged; if there's no test coverage for the code being touched, add characterization tests first. Keep the diff focused on the refactor; don't mix in unrelated fixes or features."
+  },
+  {
+    "name": "Write Documentation",
+    "description": "Document existing code, an API, or a design decision clearly.",
+    "tags": ["documentation"],
+    "content": "Write clear, accurate documentation for the specified code, API, or decision. Explain the why, not just the what, where it's non-obvious. Match the existing documentation style and location conventions in this repo rather than inventing a new format. Verify code examples actually work rather than writing plausible-looking but untested snippets."
+  },
+  {
+    "name": "Review a PR",
+    "description": "Give a thorough, actionable code review.",
+    "tags": ["code-review"],
+    "content": "Review the specified changes for correctness, readability, test coverage, and adherence to this codebase's conventions. Flag genuine issues with a clear explanation of the risk, not just style nitpicks. Distinguish must-fix issues from optional suggestions explicitly. Note anything you're uncertain about rather than asserting confidence you don't have."
+  },
+  {
+    "name": "Investigate a Performance Issue",
+    "description": "Diagnose and address a reported performance problem with evidence.",
+    "tags": ["performance"],
+    "content": "Investigate the reported performance issue: measure before changing anything, form a hypothesis about the bottleneck backed by evidence (profiling output, timing, query plans), and only then make a targeted change. Measure again after the change to confirm it actually helped. Avoid speculative optimization of code that isn't shown to be the bottleneck."
+  },
+  {
+    "name": "Security Review",
+    "description": "Review code or a design for common security weaknesses.",
+    "tags": ["security"],
+    "content": "Review the specified code or design for common security weaknesses relevant to its context — injection, authentication/authorization gaps, secrets handling, unsafe deserialization, and similar OWASP-class issues. Prioritize findings by actual exploitability and impact, not just theoretical presence. Propose a concrete fix for anything you flag, not just the finding."
+  }
+]

@@ -75,6 +75,26 @@ public sealed class PromptService(IPromptRepository repository, IEmbeddingProvid
         await repository.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Promotes a version to Active — the manual counterpart to the automatic, policy-driven
+    /// promotion <c>AutoPromotionTrigger</c> performs in <c>PromptOps.Infrastructure</c> (Phase 11).
+    /// Both paths funnel through the same <see cref="Prompt.ActivateVersion"/> domain method, so
+    /// "exactly one Active version" is enforced identically either way.
+    /// </summary>
+    public async Task ActivateVersionAsync(
+        Guid promptId,
+        Guid versionId,
+        CancellationToken cancellationToken = default)
+    {
+        var prompt = await GetOrThrowAsync(promptId, cancellationToken);
+        FindVersionOrThrow(prompt, versionId);
+
+        prompt.ActivateVersion(versionId);
+
+        await repository.UpdateAsync(prompt, cancellationToken);
+        await repository.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task AddPromptDependencyAsync(
         Guid promptId,
         Guid versionId,
@@ -103,6 +123,12 @@ public sealed class PromptService(IPromptRepository repository, IEmbeddingProvid
         " ",
         new[] { prompt.Name, prompt.Metadata.Description, string.Join(" ", prompt.Metadata.Tags), version.Content }
             .Where(part => !string.IsNullOrWhiteSpace(part)));
+
+    public Task<PromptMetadataView?> GetMetadataAsync(Guid promptId, CancellationToken cancellationToken = default)
+        => repository.GetMetadataAsync(promptId, cancellationToken);
+
+    public Task<IReadOnlyList<PromptSummary>> ListAsync(CancellationToken cancellationToken = default)
+        => repository.GetAllNamesAsync(cancellationToken);
 
     private async Task<Prompt> GetOrThrowAsync(Guid promptId, CancellationToken cancellationToken)
         => await repository.GetByIdAsync(promptId, cancellationToken)

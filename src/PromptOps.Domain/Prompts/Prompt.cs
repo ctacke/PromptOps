@@ -105,4 +105,32 @@ public sealed class Prompt
 
         Metadata = Metadata with { Tags = merged };
     }
+
+    /// <summary>
+    /// Promotes <paramref name="versionId"/> to <see cref="PromptVersionStatus.Active"/>, deprecating
+    /// whichever sibling version currently holds that status (if any) — the aggregate root enforces
+    /// "exactly one Active version per prompt" itself, the same way <see cref="Rehydrate"/> already
+    /// enforces "no duplicate version numbers" itself, rather than leaving it to a caller to get right.
+    /// Idempotent: re-activating the already-active version is a no-op, not an error. Reactivating a
+    /// <see cref="PromptVersionStatus.Deprecated"/> version (a rollback) is not supported — <see cref="PromptVersion.Activate"/>
+    /// only allows Draft to Active.
+    /// </summary>
+    public void ActivateVersion(Guid versionId)
+    {
+        var version = _versions.FirstOrDefault(v => v.Id == versionId)
+            ?? throw new InvalidOperationException($"Prompt '{Id}' has no version '{versionId}'.");
+
+        if (version.Status == PromptVersionStatus.Active)
+            return;
+
+        // Validate the target transition is legal *before* touching any sibling — otherwise an
+        // illegal target (e.g. Deprecated) would leave the prior Active version deprecated with
+        // nothing having taken its place.
+        if (version.Status == PromptVersionStatus.Deprecated)
+            throw new InvalidOperationException($"Prompt version '{versionId}' is deprecated and cannot be reactivated.");
+
+        var currentlyActive = _versions.FirstOrDefault(v => v.Status == PromptVersionStatus.Active);
+        currentlyActive?.Deprecate();
+        version.Activate();
+    }
 }

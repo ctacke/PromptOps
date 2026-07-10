@@ -99,31 +99,4 @@ public class PromptServiceEmbeddingIndexingTests
             => Task.FromResult<IReadOnlyList<EmbeddingMatch>>([]);
     }
 
-    private sealed class FakeMutablePromptRepository : IPromptRepository
-    {
-        private readonly Dictionary<Guid, Prompt> _prompts = [];
-
-        public Task AddAsync(Prompt prompt, CancellationToken cancellationToken = default)
-        {
-            _prompts[prompt.Id] = prompt;
-            return Task.CompletedTask;
-        }
-
-        public Task<Prompt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-            => Task.FromResult(_prompts.GetValueOrDefault(id));
-
-        public Task UpdateAsync(Prompt prompt, CancellationToken cancellationToken = default)
-        {
-            _prompts[prompt.Id] = prompt;
-            return Task.CompletedTask;
-        }
-
-        public Task<PromptMetadataView?> GetMetadataAsync(Guid id, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<PromptRecommendationCandidate>> GetRecommendationCandidatesAsync(CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
 }

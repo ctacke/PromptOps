@@ -111,13 +111,43 @@ public sealed class PromptRepository(PromptOpsDbContext db) : IPromptRepository
         return candidates;
     }
 
+    public async Task<IReadOnlyList<PromptSummary>> GetAllNamesAsync(CancellationToken cancellationToken = default)
+    {
+        // Deliberately no .Include(p => p.Versions) or .Metadata — same "must not load version
+        // content" discipline as GetMetadataAsync/GetRecommendationCandidatesAsync, just narrower
+        // still since this doesn't even need metadata, only identity.
+        var summaries = await db.Prompts
+            .AsNoTracking()
+            .Select(p => new PromptSummary(p.Id, p.Name))
+            .ToListAsync(cancellationToken);
+
+        return summaries;
+    }
+
+    /// <summary>Loads the full <see cref="Prompt"/> aggregate that owns the given version — used by <c>AutoPromotionTrigger</c> (Phase 11), which only has a <c>PromptVersionId</c> to start from.</summary>
+    public async Task<Prompt?> GetByVersionIdAsync(Guid versionId, CancellationToken cancellationToken = default)
+    {
+        var trackedMatch = _tracked.Values.FirstOrDefault(r => r.Versions.Any(v => v.Id == versionId));
+        if (trackedMatch is not null)
+            return PromptMapper.ToDomain(trackedMatch);
+
+        var record = await FullPromptQuery().FirstOrDefaultAsync(p => p.Versions.Any(v => v.Id == versionId), cancellationToken);
+        if (record is null)
+            return null;
+
+        _tracked[record.Id] = record;
+        return PromptMapper.ToDomain(record);
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => db.SaveChangesAsync(cancellationToken);
 
     private Task<PromptRecord?> LoadFullRecordAsync(Guid id, CancellationToken cancellationToken)
+        => FullPromptQuery().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+    private IQueryable<PromptRecord> FullPromptQuery()
         => db.Prompts
             .Include(p => p.Metadata)
             .Include(p => p.Versions)
-            .ThenInclude(v => v.Dependencies)
-            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            .ThenInclude(v => v.Dependencies);
 }
