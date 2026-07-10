@@ -40,25 +40,17 @@ RUN dotnet publish plugins/PromptOps.Plugins.Sonar/PromptOps.Plugins.Sonar.cspro
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Node.js + the Claude Code CLI back the optional "claude-cli" AIExecutionProvider
-# (docs/ai-evaluation.md): the daemon shells out to `claude -p` for real AI-judge calls instead
-# of the "manual"/echo test stub. Off by default (AIExecution__Provider unset) — installed
-# unconditionally here so switching it on later doesn't require an image rebuild.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl gnupg ca-certificates \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g @anthropic-ai/claude-code \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system promptops && useradd --system --gid promptops --home-dir /app promptops \
-    && mkdir -p /data /app/.claude \
+    && mkdir -p /data \
     && chown -R promptops:promptops /app /data
 
 COPY --from=build --chown=promptops:promptops /app .
 
 USER promptops
-ENV HOME=/app \
-    ASPNETCORE_URLS=http://+:8080 \
+ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \
     ConnectionStrings__PromptOps="Data Source=/data/promptops.db"
 EXPOSE 8080
