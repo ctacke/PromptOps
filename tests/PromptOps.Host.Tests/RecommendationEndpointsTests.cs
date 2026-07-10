@@ -10,11 +10,14 @@ using Xunit;
 namespace PromptOps.Host.Tests;
 
 /// <summary>
-/// End-to-end over real HTTP against the actual production DI graph (Phase 9). There's no
-/// ingestion endpoint for creating prompts (Phase 2 never got one — out of this phase's scope to
-/// add), so prompt/tag/version setup goes through <see cref="PromptService"/> directly via the
-/// factory's service provider; the actual thing under test, <c>POST /recommendations</c>, still
-/// goes over real HTTP.
+/// End-to-end over real HTTP against the actual production DI graph (Phase 9, extended in
+/// Phase 10). There's no ingestion endpoint for creating prompts (Phase 2 never got one — out of
+/// scope to add here), so prompt/tag/version setup goes through <see cref="PromptService"/>
+/// directly via the factory's service provider — which also means <see cref="PromptService"/>'s
+/// Phase 10 embedding-indexing runs for real, using the real (non-stub)
+/// <c>HashingBagOfWordsEmbeddingProvider</c>. The actual thing under test, <c>POST /recommendations</c>,
+/// still goes over real HTTP, and resolves to <c>SemanticRecommendationProvider</c> (v2) — the
+/// bound <c>IRecommendationProvider</c> as of Phase 10, not v1.
 /// </summary>
 public class RecommendationEndpointsTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
 {
@@ -28,14 +31,14 @@ public class RecommendationEndpointsTests : IClassFixture<WebApplicationFactory<
         _client = _factory.CreateClient();
     }
 
-    private async Task<(Guid PromptId, Guid VersionId)> SeedTaggedPromptAsync(string name, string[] tags)
+    private async Task<(Guid PromptId, Guid VersionId)> SeedTaggedPromptAsync(string name, string[] tags, string content = "content")
     {
         using var scope = _factory.Services.CreateScope();
         var promptService = scope.ServiceProvider.GetRequiredService<PromptService>();
 
         var prompt = await promptService.CreatePromptAsync(name);
         await promptService.TagPromptAsync(prompt.Id, tags);
-        var version = await promptService.CreateVersionAsync(prompt.Id, "content", "alice");
+        var version = await promptService.CreateVersionAsync(prompt.Id, content, "alice");
 
         return (prompt.Id, version.Id);
     }
@@ -71,8 +74,11 @@ public class RecommendationEndpointsTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
-    public async Task Returns_An_Empty_List_When_Nothing_Matches_The_Classified_Tags()
+    public async Task A_Tag_Mismatched_Candidate_Still_Surfaces_Since_V2_Blends_Rather_Than_Excludes()
     {
+        // v1 (Phase 9) would have excluded this entirely on zero tag overlap. v2 (Phase 10) must
+        // not — excluding zero-tag-overlap candidates outright is exactly what would make
+        // "semantically similar surfaces without exact tag overlap" impossible.
         await SeedTaggedPromptAsync("Test Writer", ["testing"]);
 
         var response = await _client.PostAsJsonAsync("/recommendations", new
@@ -82,7 +88,38 @@ public class RecommendationEndpointsTests : IClassFixture<WebApplicationFactory<
         });
 
         var results = await response.Content.ReadFromJsonAsync<List<RecommendationResponse>>();
-        Assert.Empty(results!);
+        var result = Assert.Single(results!);
+        Assert.Contains("Matched 0/1 requested tag(s)", result.Rationale);
+    }
+
+    [Fact]
+    public async Task A_Semantically_Similar_Task_Ranks_Above_An_Unrelated_One_Despite_Neither_Matching_Tags()
+    {
+        // The phase's core acceptance criterion, proven at the HTTP level with the real (word-
+        // overlap-based) HashingBagOfWordsEmbeddingProvider — no stubbing of the embedding step.
+        // Classification is stubbed (ManualAIExecutionProvider) to a tag that matches *neither*
+        // candidate, so only semantic similarity (driven by shared vocabulary in the prompt's
+        // content) can explain the ranking difference.
+        var (_, relevantVersionId) = await SeedTaggedPromptAsync(
+            "Null Reference Debugger",
+            tags: ["exception-handling"],
+            content: "Investigate the null reference exception and debugging steps needed to fix it.");
+        await SeedTaggedPromptAsync(
+            "Changelog Writer",
+            tags: ["documentation"],
+            content: "Summarize recent commits into a concise changelog entry for release notes.");
+
+        var response = await _client.PostAsJsonAsync("/recommendations", new
+        {
+            taskDescription = "getting a null reference exception, need help debugging it",
+            repository = (string?)null,
+            limit = 5,
+            parameters = new Dictionary<string, string> { ["output"] = """["unrelated-tag"]""" }
+        });
+
+        var results = await response.Content.ReadFromJsonAsync<List<RecommendationResponse>>();
+        Assert.NotEmpty(results!);
+        Assert.Equal(relevantVersionId, results![0].RecommendedPromptVersionId);
     }
 
     [Fact]

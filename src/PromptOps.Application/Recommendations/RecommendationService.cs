@@ -21,6 +21,6 @@ public sealed class RecommendationService(
         CancellationToken cancellationToken = default)
     {
         var tags = await classifier.ClassifyAsync(taskDescription, parameters ?? new Dictionary<string, string>(), cancellationToken);
-        return await recommendationProvider.RecommendAsync(tags, repository, limit, cancellationToken);
+        return await recommendationProvider.RecommendAsync(tags, taskDescription, repository, limit, cancellationToken);
     }
 }

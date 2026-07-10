@@ -12,6 +12,7 @@ public sealed class PromptOpsDbContext(DbContextOptions<PromptOpsDbContext> opti
     public DbSet<AIEvaluationEntity> AIEvaluations => Set<AIEvaluationEntity>();
     public DbSet<ScoringConfigEntity> ScoringConfigs => Set<ScoringConfigEntity>();
     public DbSet<PromptScoreEntity> PromptScores => Set<PromptScoreEntity>();
+    public DbSet<EmbeddingEntity> Embeddings => Set<EmbeddingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

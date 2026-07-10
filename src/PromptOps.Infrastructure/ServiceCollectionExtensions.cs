@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PromptOps.Application.Embeddings;
 using PromptOps.Application.Evaluations;
 using PromptOps.Application.Events;
 using PromptOps.Application.Executions;
@@ -35,7 +36,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAIEvaluationProvider, AIJudgeEvaluationProvider>();
         services.AddScoped<IScoringProvider, WeightedSumScoringProvider>();
         services.AddScoped<IActivityClassifier, AIActivityClassifier>();
-        services.AddScoped<IRecommendationProvider, TagAndHistoryRecommendationProvider>();
+        // v1 stays registered as a concrete type (directly testable/usable on its own); v2 is the
+        // bound IRecommendationProvider as of Phase 10 — see SemanticRecommendationProvider's docs.
+        services.AddScoped<TagAndHistoryRecommendationProvider>();
+        services.AddScoped<IRecommendationProvider, SemanticRecommendationProvider>();
+        services.AddSingleton<IEmbeddingProvider, HashingBagOfWordsEmbeddingProvider>();
+        services.AddScoped<IEmbeddingStore, EmbeddingStore>();
         services.AddSingleton<ISecretProvider, EnvironmentSecretProvider>();
 
         // Recompute-on-event (debounced, Phase 8): one singleton scheduler, four domain event

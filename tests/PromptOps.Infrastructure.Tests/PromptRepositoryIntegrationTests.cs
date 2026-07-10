@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PromptOps.Application.Prompts;
 using PromptOps.Domain.Prompts;
 using PromptOps.Infrastructure.Persistence;
+using PromptOps.Infrastructure.Providers;
 using Xunit;
 
 namespace PromptOps.Infrastructure.Tests;
@@ -15,7 +16,7 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
         Guid promptId;
         using (var context = fixture.CreateContext())
         {
-            var service = new PromptService(new PromptRepository(context));
+            var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
             var prompt = await service.CreatePromptAsync("Fix a bug", new PromptMetadata { Tags = ["bugfix"] });
             promptId = prompt.Id;
 
@@ -47,7 +48,7 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
         Guid promptId;
         using (var setupContext = fixture.CreateContext())
         {
-            var service = new PromptService(new PromptRepository(setupContext));
+            var service = new PromptService(new PromptRepository(setupContext), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(setupContext));
             var prompt = await service.CreatePromptAsync(
                 "Fix a bug",
                 new PromptMetadata { Tags = ["bugfix"], Owners = ["alice"], Description = "desc" });
@@ -80,7 +81,7 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
 
         using (var context = fixture.CreateContext())
         {
-            var service = new PromptService(new PromptRepository(context));
+            var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
 
             var promptA = await service.CreatePromptAsync("Prompt A");
             var versionA = await service.CreateVersionAsync(promptA.Id, "content A", "alice");
@@ -107,7 +108,7 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
         Guid promptId;
         using (var context = fixture.CreateContext())
         {
-            var service = new PromptService(new PromptRepository(context));
+            var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
             var prompt = await service.CreatePromptAsync("Fix a bug", new PromptMetadata { Tags = ["bugfix"], Description = "desc" });
             promptId = prompt.Id;
 
@@ -131,7 +132,7 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
         Guid versionId;
         using (var context = fixture.CreateContext())
         {
-            var service = new PromptService(new PromptRepository(context));
+            var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
             var prompt = await service.CreatePromptAsync("Fix a bug");
             promptId = prompt.Id;
             var version = await service.CreateVersionAsync(promptId, "content", "alice");
@@ -150,7 +151,7 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
     public async Task CreateVersion_throws_when_prompt_does_not_exist()
     {
         using var context = fixture.CreateContext();
-        var service = new PromptService(new PromptRepository(context));
+        var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
 
         await Assert.ThrowsAsync<PromptNotFoundException>(
             () => service.CreateVersionAsync(Guid.NewGuid(), "content", "alice"));
@@ -160,7 +161,7 @@ public class PromptRepositoryIntegrationTests(SqliteFixture fixture) : IClassFix
     public async Task DeprecatePromptVersion_throws_when_version_does_not_exist()
     {
         using var context = fixture.CreateContext();
-        var service = new PromptService(new PromptRepository(context));
+        var service = new PromptService(new PromptRepository(context), new HashingBagOfWordsEmbeddingProvider(), new EmbeddingStore(context));
         var prompt = await service.CreatePromptAsync("Fix a bug");
 
         await Assert.ThrowsAsync<PromptVersionNotFoundException>(

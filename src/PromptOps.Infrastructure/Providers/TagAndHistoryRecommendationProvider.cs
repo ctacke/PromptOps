@@ -7,12 +7,17 @@ using PromptOps.Domain.Recommendations;
 namespace PromptOps.Infrastructure.Providers;
 
 /// <summary>
-/// Reference <see cref="IRecommendationProvider"/> (Phase 9, ADR-0003: "TagAndHistoryRecommendationProvider").
-/// Ranks by tag overlap with <see cref="PromptOps.Domain.Scoring.PromptScore"/>'s latest
-/// <c>OverallScore</c> (Phase 8) as the quality signal — across every repo in the shared database
-/// by default (ADR-0005), narrowed to one repo only if <paramref name="repository"/> is given
-/// (see <see cref="RecommendAsync"/>'s params). Every result carries a human-readable rationale
-/// (Phase 9's explicit "not a black-box score" acceptance criterion) instead of a bare number.
+/// Reference <see cref="IRecommendationProvider"/> v1 (Phase 9, ADR-0003:
+/// "TagAndHistoryRecommendationProvider"). Ranks by tag overlap with
+/// <see cref="PromptOps.Domain.Scoring.PromptScore"/>'s latest <c>OverallScore</c> (Phase 8) as
+/// the quality signal — across every repo in the shared database by default (ADR-0005), narrowed
+/// to one repo only if <paramref name="repository"/> is given. Every result carries a
+/// human-readable rationale (Phase 9's "not a black-box score" acceptance criterion).
+///
+/// Still registered as a concrete type (not the bound <c>IRecommendationProvider</c>) after
+/// Phase 10 — <see cref="SemanticRecommendationProvider"/> (v2) is what the application actually
+/// uses now, but v1 stays as-is, directly testable and available, since <c>ignores taskDescription</c>
+/// is a perfectly legitimate provider for anyone who only has tags and no free text.
 /// </summary>
 public sealed class TagAndHistoryRecommendationProvider(
     IPromptRepository promptRepository,
@@ -21,36 +26,20 @@ public sealed class TagAndHistoryRecommendationProvider(
 {
     public async Task<IReadOnlyList<Recommendation>> RecommendAsync(
         IReadOnlyList<string> tags,
+        string? taskDescription = null,
         string? repository = null,
         int limit = 5,
         CancellationToken cancellationToken = default)
     {
-        var candidates = await promptRepository.GetRecommendationCandidatesAsync(cancellationToken);
-        var entries = new List<RankingEntry>();
+        var gathered = await RecommendationCandidateGatherer.GatherAsync(
+            promptRepository, scoreRepository, executionRepository, tags, repository, cancellationToken);
 
-        foreach (var candidate in candidates)
-        {
-            // No tags requested = no filter (match everything); tags requested but zero overlap = excluded.
-            var matchedTagCount = candidate.Tags.Count(t => tags.Contains(t, StringComparer.OrdinalIgnoreCase));
-            if (tags.Count > 0 && matchedTagCount == 0)
-                continue;
-
-            var executions = await executionRepository.GetByPromptVersionIdAsync(candidate.PromptVersionId, cancellationToken);
-            if (repository is not null && !executions.Any(e => string.Equals(e.Context.Repository, repository, StringComparison.OrdinalIgnoreCase)))
-                continue;
-
-            var scoreHistory = await scoreRepository.GetByPromptVersionIdAsync(candidate.PromptVersionId, cancellationToken);
-            var latestScore = scoreHistory.Count == 0 ? null : scoreHistory[^1]; // chronological — last is most recent
-
-            var repositoryCount = executions.Select(e => e.Context.Repository).Distinct(StringComparer.OrdinalIgnoreCase).Count();
-
-            entries.Add(new RankingEntry(candidate, matchedTagCount, latestScore?.OverallScore, latestScore?.SampleSize ?? 0, repositoryCount));
-        }
-
-        var ranked = entries
-            .OrderByDescending(e => e.Score.HasValue) // scored candidates before never-scored ones
-            .ThenByDescending(e => e.Score ?? 0)
-            .ThenByDescending(e => e.MatchedTagCount)
+        // No tags requested = no filter (match everything); tags requested but zero overlap = excluded.
+        var ranked = gathered
+            .Where(g => tags.Count == 0 || g.MatchedTagCount > 0)
+            .OrderByDescending(g => g.Score.HasValue) // scored candidates before never-scored ones
+            .ThenByDescending(g => g.Score ?? 0)
+            .ThenByDescending(g => g.MatchedTagCount)
             .Take(limit)
             .ToList();
 
@@ -72,7 +61,7 @@ public sealed class TagAndHistoryRecommendationProvider(
         return repository is null ? context : $"{context}; repository={repository}";
     }
 
-    private static string BuildRationale(RankingEntry entry, IReadOnlyList<string> tags)
+    private static string BuildRationale(GatheredCandidate entry, IReadOnlyList<string> tags)
     {
         var tagPart = tags.Count > 0
             ? $"Matched {entry.MatchedTagCount}/{tags.Count} requested tag(s)."
@@ -84,6 +73,4 @@ public sealed class TagAndHistoryRecommendationProvider(
 
         return $"{tagPart} {scorePart}";
     }
-
-    private sealed record RankingEntry(PromptRecommendationCandidate Candidate, int MatchedTagCount, double? Score, int SampleSize, int RepositoryCount);
 }
