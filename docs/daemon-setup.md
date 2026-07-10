@@ -39,7 +39,7 @@ Per ADR-0007, the daemon must never be reachable from outside the host machine. 
 ## Surfaces exposed
 
 - **Loopback ingestion API** — `http://127.0.0.1:5179/executions/...` — what Claude Code hooks call (Phase 4b). See `docs/execution-tracking.md`, `docs/metrics.md`, and `docs/human-evaluation.md` for the endpoint contracts (execution tracking, engineering metrics, human evaluation).
-- **MCP over HTTP** — `http://127.0.0.1:5179/mcp` (streamable HTTP transport). Registered automatically when the Claude Code plugin is installed (Phase 4b) — no manual `claude mcp add` step needed from inside a repo that has the plugin. Current tools: `health_check`, `version`, `create_prompt`, `create_prompt_version`, `get_prompt`, `list_prompts`, `activate_prompt_version`, `get_promotion_policy`, `update_promotion_policy`, `submit_human_evaluation`, `get_human_evaluations`, `recommend_prompt`.
+- **MCP over HTTP** — `http://127.0.0.1:5179/mcp` (streamable HTTP transport). Registered automatically when the Claude Code plugin is installed (Phase 4b) — no manual `claude mcp add` step needed from inside a repo that has the plugin. Current tools: `health_check`, `version`, `create_prompt`, `create_prompt_version`, `get_prompt`, `list_prompts`, `activate_prompt_version`, `get_promotion_policy`, `update_promotion_policy`, `submit_human_evaluation`, `get_human_evaluations`, `run_ai_evaluation`, `get_ai_evaluation_policy`, `update_ai_evaluation_policy`, `recommend_prompt`.
 
 ## Metric-collector plugins
 

@@ -20,7 +20,7 @@ No manual config editing is required beyond that — installing the plugin:
 
 - Registers hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `SessionEnd`) from `claude-plugin/hooks/hooks.json`.
 - Registers the daemon as a remote MCP server (`claude-plugin/.mcp.json`, `http://127.0.0.1:5179/mcp`) — no separate `claude mcp add` step.
-- Adds the `/promptops:setup`, `/promptops:init`, `/promptops:rate`, `/promptops:recommend`, `/promptops:history` skills.
+- Adds the `/promptops:setup`, `/promptops:init`, `/promptops:rate`, `/promptops:evaluate`, `/promptops:recommend`, `/promptops:history` skills.
 
 ## What happens when you start a session
 

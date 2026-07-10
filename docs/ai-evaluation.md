@@ -59,7 +59,26 @@ GET /executions/{id}/ai-evaluations
 → 200 OK [ { ... }, { ... } ]   (chronological, may be empty)
 ```
 
-No MCP tool or Claude Code skill this phase — unlike Phase 6's `/promptops rate`, nothing in the phase's acceptance criteria or ADR-0006 calls for the *agent* to trigger or read AI evaluations mid-session; this is backend judge machinery that later phases (8: scoring, 9: recommendation) consume, not a developer-facing action.
+## Running it without a manual `POST` — `AIEvaluationPolicy` + `AutoAIEvaluationTrigger`
+
+The line above ("no MCP tool or Claude Code skill this phase") held until a later gap-closing pass: nothing made AI evaluation happen except an explicit `POST`, and nothing wrapped it for the agent either. Both are closed now, in two complementary ways:
+
+**Automatic, opt-in.** `AIEvaluationPolicy` (`src/PromptOps.Domain/Evaluations/AIEvaluationPolicy.cs`) is a single global settings singleton — same shape as `PromotionPolicy` (`docs/promotion-policy.md`) but simpler: one flag, `AutoEvaluateOnFinish`, off by default. When on, `AutoAIEvaluationTrigger` (`src/PromptOps.Infrastructure/Evaluations/`) — a second `IDomainEventHandler<ExecutionRecorded>` registered alongside `ScoreRecomputeTrigger` — runs the judge automatically the moment an execution finishes (`ExecutionRecorded` fires exactly once, from `ExecutionRecord.Finish()`, at the point output/diff data first exists). The actual judge call runs in a detached background task with its own DI scope: `DomainEventPublisher` awaits every handler for an event sequentially, so this must return immediately rather than block the `/executions/{id}/finish` response on a multi-attempt LLM call. A failed background evaluation is logged, never propagated — same discipline as `DebouncedScoreRecomputeScheduler`.
+
+Off by default deliberately: unlike scoring (cheap, local computation), each judge call is a real LLM round trip with retries — auto-firing it unconditionally on every execution isn't something to default to silently.
+
+```
+GET  /ai-evaluation-policy   → current policy (lazily bootstraps default: AutoEvaluateOnFinish = false)
+PUT  /ai-evaluation-policy   { "autoEvaluateOnFinish": true }
+```
+
+**Manual, without curl.** `run_ai_evaluation` (MCP tool, `src/PromptOps.Host/Mcp/AIEvaluationTools.cs`) wraps the same `AIEvaluationService.EvaluateAsync` the REST endpoint calls — reachable whether or not the automatic trigger is on, and safe to call again to force a re-run (additive, not a replace). `get_ai_evaluation_policy`/`update_ai_evaluation_policy` mirror the REST pair for toggling automation without curl. `/promptops evaluate` (`claude-plugin/skills/evaluate/SKILL.md`) wraps all three for the developer: finds the current session's execution id the same way `/promptops rate` does, runs the evaluation, and presents the verdict — or updates the policy if asked to turn automation on/off.
+
+### Testing (automatic trigger)
+
+- `AIEvaluationPolicyTests` (Domain) — default off, `Update` sets the flag.
+- `AutoAIEvaluationTriggerTests` (Infrastructure, a real DI container of fakes rather than hand-rolled ones — needed since the trigger resolves `AIEvaluationService` itself via `IServiceScopeFactory`) — toggle off → never called; toggle on → called with the event's `ExecutionId`; `HandleAsync` returns before the gated background call completes (proves it doesn't block); a thrown exception inside the background task never propagates.
+- `AutoAIEvaluationEndToEndTests` (Host) — the real proof: with the policy on, finishing an execution over real HTTP produces a persisted `AIEvaluation` with no explicit `POST .../ai-evaluations` call anywhere in the test. Overrides `IAIExecutionProvider` for just this factory, since `ManualAIExecutionProvider` only ever echoes caller-supplied parameters and the automatic trigger has none to supply — a stub that always returns valid judge JSON is what actually exercises the wiring rather than reliably failing against the reference provider's parameter-driven design.
 
 ## Testing
 

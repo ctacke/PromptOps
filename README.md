@@ -18,7 +18,7 @@ PromptOps treats prompts as versioned engineering assets and measures their effe
 
 ## How it works
 
-PromptOps runs as a small local daemon (Docker) on your machine — started once, not per project — that owns your prompt history and evaluation data. Each repository gets a thin Claude Code plugin: hooks that capture context and execution data automatically, and slash commands (`/promptops init`, `/promptops rate`, `/promptops recommend`, `/promptops history`) for anything that needs a human. Because every repo talks to the same local daemon, a recommendation on a brand-new project can draw on history from every other project on your machine — nothing is siloed per repo, and nothing leaves your machine.
+PromptOps runs as a small local daemon (Docker) on your machine — started once, not per project — that owns your prompt history and evaluation data. Each repository gets a thin Claude Code plugin: hooks that capture context and execution data automatically, and slash commands (`/promptops init`, `/promptops rate`, `/promptops evaluate`, `/promptops recommend`, `/promptops history`) for anything that needs a human. Because every repo talks to the same local daemon, a recommendation on a brand-new project can draw on history from every other project on your machine — nothing is siloed per repo, and nothing leaves your machine.
 
 Want to start using it with an existing project? [`docs/getting-started.md`](docs/getting-started.md) is the practical walkthrough. See [`docs/architecture.md`](docs/architecture.md) for the full architecture and design rationale, and [`docs/project-plan.md`](docs/project-plan.md) for the phased implementation plan.
 

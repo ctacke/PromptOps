@@ -96,11 +96,15 @@ Once a session's execution has finished, ask Claude:
 
 It'll ask you a handful of 1-5 questions (correctness, helpfulness, architecture quality, readability, completeness, hallucinations, confidence, overall satisfaction) and submit them as a `HumanEvaluation`. Scoring recomputes automatically whenever new data lands for an execution — a rating, metrics arriving, or an AI evaluation — so you don't need to trigger anything else afterward.
 
-If you also want the AI-judge pass (`docs/ai-evaluation.md`) — a second AI opinion checking the diff against acceptance criteria and ADRs — that one currently needs an explicit call, since no skill or MCP tool wraps it yet:
+If you also want the AI-judge pass (`docs/ai-evaluation.md`) — a second AI opinion checking the diff against acceptance criteria and ADRs — ask Claude:
 
-```powershell
-Invoke-RestMethod "http://127.0.0.1:5179/executions/<execution-id>/ai-evaluations" -Method Post
-```
+> `/promptops evaluate`
+
+Or turn it on for every execution automatically, no manual step needed:
+
+> `/promptops evaluate` — turn on automatic AI evaluation
+
+(equivalently, `Invoke-RestMethod http://127.0.0.1:5179/ai-evaluation-policy -Method Put -ContentType "application/json" -Body '{"autoEvaluateOnFinish":true}'`). It's off by default since each evaluation is a real judge-model call.
 
 Engineering metrics (build/test/Sonar) arrive on their own once CI runs, if those plugins are configured — see `docs/daemon-setup.md`.
 

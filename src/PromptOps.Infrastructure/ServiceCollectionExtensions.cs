@@ -14,6 +14,7 @@ using PromptOps.Domain.Evaluations;
 using PromptOps.Domain.Executions;
 using PromptOps.Domain.Metrics;
 using PromptOps.Domain.Scoring;
+using PromptOps.Infrastructure.Evaluations;
 using PromptOps.Infrastructure.Persistence;
 using PromptOps.Infrastructure.Promotion;
 using PromptOps.Infrastructure.Providers;
@@ -47,6 +48,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmbeddingStore, EmbeddingStore>();
         services.AddSingleton<ISecretProvider, EnvironmentSecretProvider>();
         services.AddScoped<IPromotionPolicyRepository, PromotionPolicyRepository>();
+        services.AddScoped<IAIEvaluationPolicyRepository, AIEvaluationPolicyRepository>();
 
         // Recompute-on-event (debounced, Phase 8): one singleton scheduler, four domain event
         // registrations feeding it (see ScoreRecomputeTrigger's docs for why one class/four regs).
@@ -58,6 +60,10 @@ public static class ServiceCollectionExtensions
 
         // Auto-promotion (Phase 11): the first-ever handler for ScoreComputed.
         services.AddScoped<IDomainEventHandler<ScoreComputed>, AutoPromotionTrigger>();
+
+        // Automatic AI evaluation: a second handler for ExecutionRecorded, alongside
+        // ScoreRecomputeTrigger — DomainEventPublisher resolves and invokes both.
+        services.AddScoped<IDomainEventHandler<ExecutionRecorded>, AutoAIEvaluationTrigger>();
 
         return services;
     }

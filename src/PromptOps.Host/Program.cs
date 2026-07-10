@@ -36,6 +36,7 @@ app.MapScoringEndpoints();
 app.MapRecommendationEndpoints();
 app.MapPromptEndpoints();
 app.MapPromotionPolicyEndpoints();
+app.MapAIEvaluationPolicyEndpoints();
 app.MapMcp("/mcp");
 
 app.Run();

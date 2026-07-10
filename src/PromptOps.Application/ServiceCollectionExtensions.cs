@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MetricsCollectionService>();
         services.AddScoped<HumanEvaluationService>();
         services.AddScoped<AIEvaluationService>();
+        services.AddScoped<AIEvaluationPolicyService>();
         services.AddScoped<ScoringService>();
         services.AddScoped<RecommendationService>();
         services.AddScoped<PromotionPolicyService>();
