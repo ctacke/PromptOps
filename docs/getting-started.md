@@ -165,6 +165,43 @@ Any `PromptVersion` whose recomputed score clears `minimumScoreThreshold` (or be
 
 With both toggles set: sessions run, executions finish, the judge evaluates automatically, scores recompute, and winning versions promote themselves — the loop above (steps 4–9) keeps happening without you doing anything beyond writing code.
 
+## Updating an existing installation
+
+Setup in step 1 was two independent parts — updating follows the same split, and doing one doesn't update the other. Neither one touches your data: prompts, versions, executions, evaluations, and scores all survive an update either way.
+
+### Update the daemon
+
+Still once per machine. If you're running the published GHCR image:
+
+```powershell
+docker pull ghcr.io/ctacke/promptops:latest
+docker stop promptops-daemon
+docker rm promptops-daemon
+docker run -d --name promptops-daemon --restart unless-stopped -p 127.0.0.1:5179:8080 -v promptops-data:/data ghcr.io/ctacke/promptops:latest
+```
+
+`docker stop`/`docker rm` only remove the container — your data lives in the separate `promptops-data` named volume (`-v promptops-data:/data`), which isn't touched as long as you don't add `-v` to a later `docker compose down`. Re-mounting the same volume on the new container is what makes this safe: prompts, versions, executions, and evaluations are all still there once it comes back up, and any pending EF Core migrations run automatically at startup, before the daemon starts serving requests.
+
+If you built from source instead: `git pull`, then `docker compose up -d --build` — same volume, same guarantee.
+
+If you'd rather not take that on faith, back it up first — it's one command:
+
+```powershell
+docker compose cp promptops-daemon:/data/promptops.db ./promptops-backup.db
+```
+
+Full details: `docs/daemon-setup.md` ("Upgrading the image", "Where data lives").
+
+### Update the plugin
+
+Per repo, since the plugin is installed per repo. From inside a Claude Code session in that repo:
+
+```
+claude plugin marketplace update promptops
+```
+
+(or the slash-command equivalent, `/plugin marketplace update promptops`, or `/plugin` → **Marketplaces** tab → **Update marketplace listing**). This pulls the latest commit from `ctacke/PromptOps` — refreshed hooks, skills, and MCP registration. Plugins don't auto-update on their own, so this is something you re-run when you want the latest, not a one-time step. It only refreshes the marketplace listing — run `/reload-plugins` afterward so the current session actually picks up the change.
+
 ## Where things stand
 
 - Execution tracking, engineering metrics, human evaluation, AI evaluation, scoring, semantic recommendation, and manual/automatic promotion are all live daemon-side (see `README.md`'s Status line for the current phase list).
