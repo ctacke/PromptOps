@@ -10,8 +10,20 @@ Runs (or configures) the AI-judge evaluation pass via the daemon's `run_ai_evalu
 ## Running an evaluation
 
 1. Find the execution id the same way `/promptops rate` does: the current session's execution id was recorded by the `SessionStart` hook at `${CLAUDE_PLUGIN_DATA}/state/<session_id>.json` (field `executionId`). Glob `${CLAUDE_PLUGIN_DATA}/state/*.json`, pick the most recently modified one, and read its `executionId` field. If no state file exists, tell the user there's nothing to evaluate yet and stop — don't fabricate an execution id.
-2. Call `run_ai_evaluation` with that execution id.
-3. Present the result plainly: whether it satisfies acceptance criteria, any ADR violations, ignored requirements, unnecessary complexity notes, and suggested prompt improvements. Don't editorialize about the verdict — this is a second opinion, not a final word.
+2. The daemon's registered judge backend (`ManualAIExecutionProvider`) doesn't call a model itself — it's a pass-through that expects the caller to supply the actual verdict. There's no MCP tool to fetch an `ExecutionRecord`'s stored acceptance criteria/ADRs/output back out, so *you* are the judge: review this session's actual task (the user's request, any acceptance criteria or ADRs they mentioned) against the output you produced, honestly, as if reviewing someone else's work — don't rubber-stamp your own output just because you wrote it.
+3. Build a JSON object matching this exact schema:
+   ```json
+   {
+     "satisfiesAcceptanceCriteria": true | false | null,
+     "adrViolations": ["..."],
+     "ignoredRequirements": ["..."],
+     "unnecessaryComplexityNotes": "..." | null,
+     "suggestedPromptImprovements": ["..."]
+   }
+   ```
+   Use `null` for `satisfiesAcceptanceCriteria` only if no acceptance criteria were ever given. Empty arrays/`null` are fine for the rest if there's nothing to report — don't invent violations or improvements that aren't real.
+4. Call `run_ai_evaluation` with that execution id and `parameters: { "output": "<the JSON from step 3, as a string>" }`. Omitting `parameters` causes the call to fail after 3 retries with `AIJudgeResponseInvalidException` ("No JSON object found in the response") — the stub has nothing to echo back.
+5. Present the result plainly: whether it satisfies acceptance criteria, any ADR violations, ignored requirements, unnecessary complexity notes, and suggested prompt improvements. Don't editorialize about the verdict — this is a second opinion, not a final word.
 
 Calling this again for the same execution is fine — it's additive, not a replace, so it produces another evaluation rather than erroring.
 
