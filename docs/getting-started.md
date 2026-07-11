@@ -1,22 +1,31 @@
-# Getting Started with PromptOps
+# Getting Started with PromptOps: Installation & Upgrades
 
 Welcome! PromptOps is designed to help you track, score, and continuously improve the prompts you use with AI coding assistants. It runs silently in the background of your development sessions, recording which prompt styles lead to clean builds, passing tests, and high-quality refactorings, so you always know what phrasing works best.
 
-This guide will get you up and running in a few simple steps.
+This guide covers both fresh installations and upgrades of your existing PromptOps setup.
 
 ---
 
-## Prerequisites
+## Choose Your Path
+
+*   [New Installation](#new-installation) — Follow this path if you are setting up the PromptOps daemon and installing the plugin into your project repositories for the first time.
+*   [Upgrading an Existing Installation](#upgrading-an-existing-installation) — Follow this path if you already have PromptOps installed and want to safely update the daemon or project plugins to the latest version.
+
+---
+
+## New Installation
+
+### Prerequisites
 
 - **Docker Desktop** (or an equivalent Docker daemon) running on your machine.
 - **Claude Code** installed and running in your target project.
 
 > [!NOTE]
-> The PromptOps daemon runs **once per machine**, not per repository. If you or a teammate have already started the daemon on this machine, you can skip straight to [Step 2: Install the plugin](#2-install-the-plugin-into-your-project).
+> The PromptOps daemon runs **once per machine**, not per repository. If you or a teammate have already started the daemon on this machine, you can skip straight to [Step 2: Install the Plugin into Your Project](#step-2-install-the-plugin-into-your-project).
 
 ---
 
-## 1. Start the Daemon
+### Step 1: Start the Daemon
 
 The daemon acts as your local database and scoring engine. You can spin it up with a single Docker command from any terminal:
 
@@ -30,7 +39,7 @@ Once running, you can access the visual telemetry dashboard by opening `http://1
 
 ---
 
-## 2. Install the Plugin into Your Project
+### Step 2: Install the Plugin into Your Project
 
 Navigate to your project's repository, start a Claude Code session, and run:
 
@@ -43,7 +52,7 @@ This registers the session hooks, registers the daemon as an MCP server, and add
 
 ---
 
-## 3. Seed Your Starter Prompts
+### Step 3: Seed Your Starter Prompts
 
 PromptOps works best when it has a catalog of prompts to track work against. Run the initialization command in your Claude session:
 
@@ -55,7 +64,7 @@ This seeds the shared database with eight starter prompts covering everyday task
 
 ---
 
-## 4. Manage Prompts with Natural Language
+### Step 4: Manage Prompts with Natural Language
 
 **You never need to make raw API calls, curl requests, or write scripts to manage your prompts.** Since Claude has access to the PromptOps MCP tools, you can manage your prompts using natural language. 
 
@@ -66,7 +75,7 @@ Claude will create the prompt, tag it, and write the initial draft version behin
 
 ---
 
-## 5. Write Code as You Normally Do
+### Step 5: Write Code as You Normally Do
 
 Once the plugin is installed, you don't need to change how you work. Just code, run tests, and end your Claude session normally. In the background:
 - **SessionStart**: Automatically opens a new execution record.
@@ -75,7 +84,7 @@ Once the plugin is installed, you don't need to change how you work. Just code, 
 
 ---
 
-## 6. Rate and Evaluate Your Sessions
+### Step 6: Rate and Evaluate Your Sessions
 
 To help PromptOps learn what works, you can evaluate your sessions:
 
@@ -86,7 +95,7 @@ To help PromptOps learn what works, you can evaluate your sessions:
 
 ---
 
-## 7. Get Smart Recommendations
+### Step 7: Get Smart Recommendations
 
 When you start a new task, ask Claude for the best prompt to use:
 
@@ -98,7 +107,7 @@ PromptOps will look at your task description, classify it, search your prompt hi
 
 ---
 
-## 8. Let Successful Prompts Promote Themselves
+### Step 8: Let Successful Prompts Promote Themselves
 
 By default, new versions start in `Draft`. You can let successful versions automatically promote themselves to `Active` by setting a policy. Just ask Claude:
 

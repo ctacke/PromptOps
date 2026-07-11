@@ -38,7 +38,7 @@ For a stage-by-stage walkthrough of what happens from the moment you type a task
 
 ## Get started
 
-1. **[`docs/getting-started.md`](docs/getting-started.md)** — the practical, step-by-step walkthrough: start the daemon, install the plugin into an existing project, seed some starter prompts, and use it. Start here.
+1. **[`docs/getting-started.md`](docs/getting-started.md)** — the practical, step-by-step walkthrough for new installations and upgrades: start or update the daemon, install/upgrade the plugin, seed starter prompts, and run evaluations. Start here.
 2. **[`docs/daemon-setup.md`](docs/daemon-setup.md)** — the one-time daemon setup in more detail (Docker, data persistence, upgrades, metric-collector plugins).
 3. **[`docs/installing-promptops.md`](docs/installing-promptops.md)** — the per-repo Claude Code plugin in more detail (hooks, skills, what each one does).
 
