@@ -90,11 +90,13 @@ Running this before you've even made a change (or right after your first one) wa
 - Time every tool call: `PreToolUse` writes a start timestamp locally (no network call, so it stays fast); `PostToolUse` pairs it with the tool name and duration and posts one tool-usage record to your session's `ExecutionRecord` on the daemon.
 - Do all of this best-effort and silently — a daemon hiccup here never surfaces as an error, since the tool call itself already succeeded regardless.
 
-## 5. Ending a session — `/exit`, not `/clear`
+## 5. Ending a session — and what `/clear` does to tracking
 
-**Only `/exit` (or otherwise closing the session) finalizes the execution.** `/clear` clears your context but does **not** end the session in the hook-lifecycle sense — it isn't one of the four events this plugin listens for, so it does *not* trigger the finish step below. If you `/clear` mid-session expecting a clean boundary, the same `ExecutionRecord` just keeps accumulating tool usage until you actually exit.
+**`/exit` (or otherwise closing the session) finalizes the execution directly.** `SessionEnd` fires: it computes a `git diff --numstat` against the commit recorded at `SessionStart` (files changed, lines added/removed) and posts `executionTimeMs`/`aiProviderId: "claude-code"`/those diff stats to `/executions/{id}/finish`, marking the record `Finished` and clearing its local state file. Best-effort with a short timeout — it can't block session termination, so on a daemon hiccup here the record is simply left unfinished (its state file stays put) rather than the session hanging.
 
-When the session really ends, `SessionEnd` fires: it computes a `git diff --numstat` against the commit recorded at `SessionStart` (files changed, lines added/removed) and posts `executionTimeMs`/`aiProviderId: "claude-code"`/those diff stats to `/executions/{id}/finish`, marking the record `Finished`. Best-effort with a short timeout — it can't block session termination, so on a daemon hiccup here the record is simply left unfinished rather than the session hanging.
+**`/clear` isn't one of the four events this plugin listens for, so it can't be finalized in the moment.** Instead, `SessionStart` self-heals: every time it runs, it first checks whether this same session already has an unfinished execution on record — if so, it finalizes *that* one (real diff stats, same as a normal `SessionEnd`) before opening a new one. So if `/clear` (or a crash, or anything else) leaves an execution dangling, the *next* `SessionStart` for that session cleans it up rather than letting it accumulate forever.
+
+The limitation worth knowing: this only engages when `SessionStart` actually runs again for the same session. If you `/clear` and keep working in the same continuous terminal session without a `SessionStart` ever firing again, tool usage from the new task can still land against the old task's still-open `ExecutionRecord` until something does trigger a fresh `SessionStart` (or you `/exit`). If you want a clean boundary and you're not sure whether `/clear` alone gets you one, `/exit` and start a new session is the reliable option.
 
 Verify it worked:
 

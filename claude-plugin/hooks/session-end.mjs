@@ -12,7 +12,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { daemonUrl, executionStatePath, fetchWithTimeout, readJson } from "./lib/state.mjs";
+import { daemonUrl, executionStatePath, fetchWithTimeout, readJson, removeFile } from "./lib/state.mjs";
 import { diffStats } from "./lib/git.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,7 +30,7 @@ if (!execution) process.exit(0); // no active execution (daemon was down at Sess
 const { filesChanged, linesAdded, linesDeleted } = diffStats(cwd || execution.cwd, execution.startedAtCommit);
 
 try {
-  await fetchWithTimeout(
+  const response = await fetchWithTimeout(
     `${daemonUrl()}/executions/${execution.executionId}/finish`,
     {
       method: "POST",
@@ -45,6 +45,11 @@ try {
     },
     4000
   );
+  // Only clear the state file once the finish actually landed — this is what lets a future
+  // SessionStart tell "finished" apart from "still open" purely from the file's existence
+  // (see session-start.mjs's stale-execution check). On failure, leave it in place so nothing
+  // downstream mistakes an unfinished execution for a finished one.
+  if (response.ok) removeFile(executionStatePath(sessionId));
 } catch {
   // Best-effort: SessionEnd hooks can't block session termination anyway.
 }

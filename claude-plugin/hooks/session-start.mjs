@@ -8,9 +8,11 @@ import {
   readStdinJson,
   emitHookOutput,
   writeJson,
+  readJson,
+  removeFile,
   UNTRACKED_PROMPT_VERSION_ID
 } from "./lib/state.mjs";
-import { getRepository, getBranch, getCommit, getDeveloperId, detectLanguages } from "./lib/git.mjs";
+import { getRepository, getBranch, getCommit, getDeveloperId, detectLanguages, diffStats } from "./lib/git.mjs";
 
 const input = await readStdinJson();
 const { session_id: sessionId, cwd } = input;
@@ -33,6 +35,36 @@ if (!health || !health.ok) {
       "See docs/daemon-setup.md / docs/installing-promptops.md."
   });
   process.exit(0);
+}
+
+// Finalize any execution left dangling by this session_id — /clear, a crash, or anything else
+// that reaches SessionStart again without SessionEnd having run first. /clear itself isn't a
+// hook event this plugin can observe directly; this is a general safety net instead, so it
+// self-heals regardless of what caused SessionStart to fire again while an execution was open.
+const stale = readJson(executionStatePath(sessionId));
+if (stale && stale.executionId) {
+  try {
+    const { filesChanged, linesAdded, linesDeleted } = diffStats(cwd, stale.startedAtCommit);
+    const finishResponse = await fetchWithTimeout(
+      `${daemonUrl()}/executions/${stale.executionId}/finish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          executionTimeMs: stale.startedAtMs ? Date.now() - stale.startedAtMs : 0,
+          aiProviderId: "claude-code",
+          filesChanged,
+          linesAdded,
+          linesDeleted
+        })
+      },
+      4000
+    );
+    if (finishResponse.ok) removeFile(executionStatePath(sessionId));
+  } catch {
+    // Best-effort — leave the stale file in place so the *next* SessionStart retries
+    // finalizing it, rather than losing the record silently on a daemon hiccup.
+  }
 }
 
 const startedAtCommit = getCommit(cwd);

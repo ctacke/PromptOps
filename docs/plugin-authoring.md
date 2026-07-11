@@ -83,7 +83,9 @@ The original Phase 4 plan named `Stop` as the hook that computes diff stats and 
 
 ### State across hook invocations
 
-Each hook runs as a separate OS process with no shared memory, so anything that needs to survive from `SessionStart` to `SessionEnd` (the execution id, the starting commit) is written to `${CLAUDE_PLUGIN_DATA}/state/<session_id>.json` (falls back to the OS temp dir if `CLAUDE_PLUGIN_DATA` isn't set). Per-tool-call timers live under `state/tools/<session_id>/<tool_use_id>.json` and are deleted by `PostToolUse` once consumed. See `claude-plugin/hooks/lib/state.mjs`.
+Each hook runs as a separate OS process with no shared memory, so anything that needs to survive from `SessionStart` onward (the execution id, the starting commit) is written to `${CLAUDE_PLUGIN_DATA}/state/<session_id>.json` (falls back to the OS temp dir if `CLAUDE_PLUGIN_DATA` isn't set). Per-tool-call timers live under `state/tools/<session_id>/<tool_use_id>.json` and are deleted by `PostToolUse` once consumed. See `claude-plugin/hooks/lib/state.mjs`.
+
+The execution state file's existence *is* the "is this execution still open" signal: `SessionEnd` deletes it only after a successful `/executions/{id}/finish`, and `SessionStart` checks for it on every invocation — if one already exists for this `session_id`, the previous execution was never properly finished (`/clear`, a crash, anything short of a normal `/exit`), so `SessionStart` finalizes it itself (real diff stats against the commit recorded when it opened) before starting the new one. This is what keeps an execution from accumulating tool usage indefinitely if a session never reaches a clean `SessionEnd`.
 
 ### MCP registration
 

@@ -91,6 +91,24 @@ try {
     if ($afterTool.toolUsageCount -lt 1) { Fail "expected at least 1 recorded tool usage, got $($afterTool.toolUsageCount)" }
     Write-Pass "daemon recorded $($afterTool.toolUsageCount) tool usage entrie(s)"
 
+    Write-Step "Simulating a second SessionStart for the same session_id without a SessionEnd in between (e.g. /clear, or a crash)"
+    "more changes" | Add-Content -Path "README.md"
+    Invoke-Hook -Name "session-start" -Payload @{ session_id = $sessionId; cwd = $scratchRepo; source = "startup" }
+
+    $staleFinished = Invoke-RestMethod -Uri "$BaseUrl/executions/$executionId" -Method Get
+    if ($staleFinished.status -ne "Finished") { Fail "expected the stale execution to be auto-finalized by the next SessionStart, got status $($staleFinished.status)" }
+    if ($staleFinished.filesChanged.Count -lt 1) { Fail "expected the stale execution's diff stats to reflect the file changes made before the second SessionStart" }
+    Write-Pass "stale execution $executionId was auto-finalized: filesChanged=$($staleFinished.filesChanged -join ','), linesAdded=$($staleFinished.linesAdded)"
+
+    $newState = Get-Content $statePath -Raw | ConvertFrom-Json
+    $executionId = $newState.executionId
+    if ($executionId -eq $staleFinished.id) { Fail "expected a new execution id after the second SessionStart, got the same one back" }
+    Write-Pass "a new execution opened: $executionId"
+
+    $secondInProgress = Invoke-RestMethod -Uri "$BaseUrl/executions/$executionId" -Method Get
+    if ($secondInProgress.status -ne "InProgress") { Fail "expected the new execution to be InProgress, got $($secondInProgress.status)" }
+    Write-Pass "daemon confirms the new execution is InProgress"
+
     Write-Step "Simulating SessionEnd"
     Invoke-Hook -Name "session-end" -Payload @{ session_id = $sessionId; cwd = $scratchRepo }
 
