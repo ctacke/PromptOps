@@ -26,6 +26,8 @@ docker run -d --name promptops-daemon --restart unless-stopped -p 127.0.0.1:5179
 
 *Prefer a hands-off setup?* If you've already checked out your project, you can just start Claude Code and type `/promptops setup` to let the assistant pull and run the container for you.
 
+Once running, you can access the visual telemetry dashboard by opening `http://127.0.0.1:5179` in your web browser.
+
 ---
 
 ## 2. Install the Plugin into Your Project

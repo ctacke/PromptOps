@@ -38,7 +38,12 @@ app.MapPromptEndpoints();
 app.MapPromotionPolicyEndpoints();
 app.MapAIEvaluationPolicyEndpoints();
 app.MapStatisticsEndpoints();
+app.MapDashboardEndpoints();
 app.MapMcp("/mcp");
+
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapFallbackToFile("index.html");
 
 app.Run();
 

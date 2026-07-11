@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptOps Telemetry Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              purple: '#a855f7',
+              cyan: '#06b6d4',
+              dark: '#0f172a',
+              card: 'rgba(15, 23, 42, 0.6)'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts Outfit & Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Diff Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    h1, h2, h3, .font-title {
+      font-family: 'Outfit', sans-serif;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .neon-glow-purple:hover {
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+    .neon-glow-cyan:hover {
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
+      border-color: rgba(6, 182, 212, 0.4);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-purple-500/30 selection:text-purple-200">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="h-9 w-9 rounded-lg bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <i data-lucide="zap" class="h-5 w-5 text-white"></i>
+        </div>
+        <div>
+          <span class="font-title text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">PromptOps</span>
+          <span class="text-xs text-slate-500 ml-2 font-mono px-2 py-0.5 rounded-full border border-slate-800 bg-slate-900/50">Daemon Dashboard</span>
+        </div>
+      </div>
+      
+      <nav class="flex space-x-1">
+        <button onclick="switchTab('overview')" id="tab-overview" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-slate-900 text-purple-400 border border-slate-800">
+          <i data-lucide="layout-dashboard" class="h-4 w-4"></i>
+          <span>Overview</span>
+        </button>
+        <button onclick="switchTab('prompts')" id="tab-prompts" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50">
+          <i data-lucide="file-code" class="h-4 w-4"></i>
+          <span>Prompts Catalog</span>
+        </button>
+        <button onclick="switchTab('executions')" id="tab-executions" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50">
+          <i data-lucide="terminal" class="h-4 w-4"></i>
+          <span>Execution Logs</span>
+        </button>
+        <button onclick="switchTab('settings')" id="tab-settings" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50">
+          <i data-lucide="sliders" class="h-4 w-4"></i>
+          <span>Policies</span>
+        </button>
+      </nav>
+      
+      <div class="flex items-center space-x-3">
+        <div id="connection-status" class="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Daemon Connected</span>
+        </div>
+        <button onclick="refreshAll()" class="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-950 transition-all rounded-lg border border-slate-800" title="Refresh Data">
+          <i data-lucide="refresh-cw" class="h-4 w-4" id="refresh-icon"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
+    
+    <!-- Tab: Overview -->
+    <div id="content-overview" class="space-y-8">
+      <!-- Grid Cards Stats -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="glass-panel rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-2px] neon-glow-purple">
+          <div class="flex items-center justify-between text-slate-400 mb-4">
+            <span class="text-sm font-medium">Tracked Executions</span>
+            <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+              <i data-lucide="activity" class="h-5 w-5"></i>
+            </div>
+          </div>
+          <div class="text-3xl font-bold font-title tracking-tight" id="stat-executions-count">-</div>
+          <div class="text-xs text-slate-500 mt-2 flex items-center space-x-1">
+            <i data-lucide="plus-circle" class="h-3 w-3"></i>
+            <span>Telemetry logging in background</span>
+          </div>
+        </div>
+
+        <div class="glass-panel rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-2px] neon-glow-cyan">
+          <div class="flex items-center justify-between text-slate-400 mb-4">
+            <span class="text-sm font-medium">Average Performance Score</span>
+            <div class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+              <i data-lucide="gauge" class="h-5 w-5"></i>
+            </div>
+          </div>
+          <div class="text-3xl font-bold font-title tracking-tight" id="stat-average-score">-</div>
+          <div class="text-xs text-slate-500 mt-2 flex items-center space-x-1">
+            <i data-lucide="award" class="h-3 w-3"></i>
+            <span>Human & AI evaluations combined</span>
+          </div>
+        </div>
+
+        <div class="glass-panel rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-2px] neon-glow-purple">
+          <div class="flex items-center justify-between text-slate-400 mb-4">
+            <span class="text-sm font-medium">Active Prompt Templates</span>
+            <div class="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+              <i data-lucide="copy" class="h-5 w-5"></i>
+            </div>
+          </div>
+          <div class="text-3xl font-bold font-title tracking-tight" id="stat-prompts-count">-</div>
+          <div class="text-xs text-slate-500 mt-2 flex items-center space-x-1 text-slate-400">
+            <span id="stat-versions-count">-</span> versions total
+          </div>
+        </div>
+
+        <div class="glass-panel rounded-2xl p-6 transition-all duration-300 hover:translate-y-[-2px] neon-glow-cyan">
+          <div class="flex items-center justify-between text-slate-400 mb-4">
+            <span class="text-sm font-medium">Repositories Monitored</span>
+            <div class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+              <i data-lucide="git-branch" class="h-5 w-5"></i>
+            </div>
+          </div>
+          <div class="text-3xl font-bold font-title tracking-tight" id="stat-repos-count">-</div>
+          <div class="text-xs text-slate-500 mt-2 flex items-center space-x-1">
+            <i data-lucide="check" class="h-3 w-3"></i>
+            <span>Global local daemon</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trend Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="glass-panel rounded-2xl p-6 flex flex-col h-[350px]">
+          <h3 class="font-title text-base font-semibold text-slate-300 mb-4 flex items-center space-x-2">
+            <i data-lucide="trending-up" class="h-4 w-4 text-purple-400"></i>
+            <span>Prompt Effectiveness Trends</span>
+          </h3>
+          <div class="flex-1 relative">
+            <canvas id="scoreChart"></canvas>
+          </div>
+        </div>
+
+        <div class="glass-panel rounded-2xl p-6 flex flex-col h-[350px]">
+          <h3 class="font-title text-base font-semibold text-slate-300 mb-4 flex items-center space-x-2">
+            <i data-lucide="shield-check" class="h-4 w-4 text-cyan-400"></i>
+            <span>Build & CI Success Rate (%)</span>
+          </h3>
+          <div class="flex-1 relative">
+            <canvas id="buildChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Executions Widget -->
+      <div class="glass-panel rounded-2xl p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-title text-lg font-semibold text-slate-200">Recent Development Sessions</h3>
+          <button onclick="switchTab('executions')" class="text-xs text-purple-400 hover:text-purple-300 flex items-center space-x-1">
+            <span>View full log</span>
+            <i data-lucide="arrow-right" class="h-3.5 w-3.5"></i>
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs font-mono uppercase tracking-wider">
+                <th class="py-3 px-4">Repository / Branch</th>
+                <th class="py-3 px-4">Prompt Used</th>
+                <th class="py-3 px-4">Timestamp</th>
+                <th class="py-3 px-4">Changes</th>
+                <th class="py-3 px-4 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody id="overview-executions-body" class="divide-y divide-slate-900 text-sm">
+              <!-- Executions loaded here dynamically -->
+              <tr><td colspan="5" class="py-6 text-center text-slate-500 font-mono">Loading telemetry feed...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Prompts Catalog -->
+    <div id="content-prompts" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <!-- Left sidebar: Prompt list -->
+      <div class="lg:col-span-4 space-y-4">
+        <div class="flex justify-between items-center">
+          <h3 class="font-title text-lg font-semibold text-slate-200">Saved Prompts</h3>
+          <span id="prompt-count-badge" class="text-xs bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full text-slate-400 font-mono">0</span>
+        </div>
+        
+        <div class="space-y-3 max-h-[700px] overflow-y-auto pr-1" id="prompts-list-container">
+          <!-- Prompts loaded here dynamically -->
+          <div class="py-12 text-center text-slate-500">Loading prompt definitions...</div>
+        </div>
+      </div>
+
+      <!-- Right detail view -->
+      <div class="lg:col-span-8 glass-panel rounded-2xl p-6 space-y-6" id="prompt-detail-empty">
+        <div class="flex flex-col items-center justify-center py-32 text-slate-500 space-y-4 border border-dashed border-slate-800 rounded-xl">
+          <i data-lucide="file-code" class="h-12 w-12 text-slate-600"></i>
+          <p class="text-sm font-mono">Select a prompt template from the catalog list to inspect its versioning and scoring metrics.</p>
+        </div>
+      </div>
+
+      <div class="lg:col-span-8 glass-panel rounded-2xl p-6 space-y-6 hidden" id="prompt-detail-container">
+        <div class="flex justify-between items-start border-b border-slate-800 pb-5">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2">
+              <h2 class="font-title text-2xl font-bold tracking-tight" id="detail-prompt-name">-</h2>
+              <span id="detail-prompt-id" class="hidden"></span>
+            </div>
+            <p class="text-sm text-slate-400" id="detail-prompt-desc">-</p>
+            <div class="flex flex-wrap gap-1.5 pt-2" id="detail-prompt-tags">
+              <!-- Tags -->
+            </div>
+          </div>
+          
+          <div class="flex space-x-3">
+            <button onclick="openCreateVersionModal()" class="px-3.5 py-1.5 bg-purple-600/10 border border-purple-500/30 text-purple-400 hover:bg-purple-600/20 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-all">
+              <i data-lucide="plus" class="h-3.5 w-3.5"></i>
+              <span>New Draft</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Versions grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Versions dropdown/list -->
+          <div class="space-y-4">
+            <h3 class="font-title text-sm font-semibold text-slate-300">Version History</h3>
+            <div class="space-y-2 max-h-[300px] overflow-y-auto pr-1" id="detail-versions-list">
+              <!-- Versions -->
+            </div>
+          </div>
+          
+          <!-- Selected Version Performance -->
+          <div class="glass-panel bg-slate-950/40 rounded-xl p-5 border border-slate-800 space-y-4">
+            <div class="flex justify-between items-center">
+              <h3 class="font-title text-sm font-semibold text-slate-300">Version Analytics</h3>
+              <span class="text-xs bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-purple-400 font-mono" id="analytics-version-tag">Select Version</span>
+            </div>
+            
+            <div class="space-y-3">
+              <div class="flex justify-between items-center text-sm border-b border-slate-900 pb-2">
+                <span class="text-slate-400">Overall Effectiveness Score</span>
+                <span class="font-mono font-bold text-lg" id="analytics-score">-</span>
+              </div>
+              
+              <div class="space-y-2 pt-1" id="analytics-components-container">
+                <!-- Component scores -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prompt Content Panel -->
+        <div class="space-y-3">
+          <div class="flex justify-between items-center">
+            <h3 class="font-title text-sm font-semibold text-slate-300">Prompt Instructions</h3>
+            <div class="flex items-center space-x-2">
+              <button onclick="compareWithActive()" id="btn-compare-active" class="text-xs text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 bg-cyan-950/20 px-2.5 py-1 rounded border border-cyan-800/40">
+                <i data-lucide="git-compare" class="h-3.5 w-3.5"></i>
+                <span>Compare with Active</span>
+              </button>
+              <button onclick="copyPromptText()" class="text-xs text-slate-400 hover:text-slate-200 flex items-center space-x-1 hover:bg-slate-900 px-2.5 py-1 rounded border border-slate-800">
+                <i data-lucide="copy" class="h-3.5 w-3.5"></i>
+                <span>Copy Instructions</span>
+              </button>
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-800 bg-slate-950 font-mono text-xs text-slate-300 p-5 overflow-x-auto whitespace-pre-wrap max-h-[300px] leading-relaxed" id="detail-version-content">
+            <!-- Text Content -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Execution Logs -->
+    <div id="content-executions" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="font-title text-xl font-bold tracking-tight text-slate-200">Execution Telemetry Logs</h2>
+          <p class="text-xs text-slate-500 font-mono mt-1">Background execution telemetry captured per developer session</p>
+        </div>
+        
+        <!-- Filters -->
+        <div class="flex items-center space-x-3">
+          <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5">
+            <i data-lucide="filter" class="h-4 w-4 text-slate-500 mr-2"></i>
+            <input type="text" id="filter-repo" oninput="debounceFilter()" placeholder="Filter by repository..." class="bg-transparent border-none text-xs text-slate-200 focus:outline-none placeholder-slate-600 font-mono">
+          </div>
+          <select id="filter-status" onchange="applyFilters()" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none font-mono">
+            <option value="">All Statuses</option>
+            <option value="Finished">Finished</option>
+            <option value="Running">Running</option>
+            <option value="Failed">Failed</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Executions List Table -->
+      <div class="glass-panel rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs font-mono uppercase tracking-wider bg-slate-950/60">
+                <th class="py-3 px-6">Repository / Branch</th>
+                <th class="py-3 px-6">Prompt & Version</th>
+                <th class="py-3 px-6">Commit Hash</th>
+                <th class="py-3 px-6">Duration</th>
+                <th class="py-3 px-6">Stats</th>
+                <th class="py-3 px-6">Timestamp</th>
+                <th class="py-3 px-6 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="executions-log-body" class="divide-y divide-slate-900 text-sm">
+              <!-- Logs populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination footer -->
+        <div class="border-t border-slate-900 px-6 py-4 flex items-center justify-between text-xs text-slate-500 font-mono bg-slate-950/20">
+          <div class="flex items-center space-x-1">
+            <span>Showing page</span>
+            <span class="text-slate-300" id="paging-current">1</span>
+            <span>of</span>
+            <span class="text-slate-300" id="paging-total">1</span>
+            <span>(<span id="paging-total-items">0</span> total logs)</span>
+          </div>
+          <div class="flex space-x-2">
+            <button onclick="changePage(-1)" id="btn-page-prev" class="px-3 py-1.5 border border-slate-800 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded bg-slate-900 text-slate-300 font-medium">Prev</button>
+            <button onclick="changePage(1)" id="btn-page-next" class="px-3 py-1.5 border border-slate-800 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded bg-slate-900 text-slate-300 font-medium">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Policies & Configuration -->
+    <div id="content-settings" class="hidden max-w-2xl mx-auto space-y-8">
+      <div>
+        <h2 class="font-title text-xl font-bold tracking-tight text-slate-200">Workflow Evaluation & Promotion Policies</h2>
+        <p class="text-xs text-slate-500 font-mono mt-1">Configure scoring triggers and automated version lifecycles</p>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-6 space-y-6">
+        <h3 class="font-title text-lg font-semibold text-slate-300 border-b border-slate-900 pb-3 flex items-center space-x-2">
+          <i data-lucide="cpu" class="h-5 w-5 text-purple-400"></i>
+          <span>Automatic AI Evaluation</span>
+        </h3>
+        
+        <div class="space-y-4">
+          <div class="flex items-start justify-between">
+            <div class="space-y-0.5">
+              <label class="text-sm font-semibold text-slate-300">Run AI Judge Automatically</label>
+              <p class="text-xs text-slate-500 leading-normal pr-12">When a developer session finishes, the daemon immediately calls its configured AI model to evaluate changes against ADRs and acceptance criteria, rather than waiting for `/promptops evaluate`.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer mt-1">
+              <input type="checkbox" id="policy-ai-eval" class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-panel rounded-2xl p-6 space-y-6">
+        <h3 class="font-title text-lg font-semibold text-slate-300 border-b border-slate-900 pb-3 flex items-center space-x-2">
+          <i data-lucide="trending-up" class="h-5 w-5 text-cyan-400"></i>
+          <span>Auto-Promotion Policy</span>
+        </h3>
+        
+        <div class="space-y-5">
+          <div class="flex items-start justify-between">
+            <div class="space-y-0.5">
+              <label class="text-sm font-semibold text-slate-300">Auto-Promotion Enabled</label>
+              <p class="text-xs text-slate-500 leading-normal pr-12">Automatically promote draft versions to `Active` state if their aggregated execution scores clear the threshold rules.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer mt-1">
+              <input type="checkbox" id="policy-auto-promote" class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+            </label>
+          </div>
+
+          <div class="border-t border-slate-900/60 pt-4 space-y-4">
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Minimum Score Threshold</label>
+                <span class="text-sm font-mono text-cyan-400 font-bold" id="threshold-val">85%</span>
+              </div>
+              <input type="range" id="policy-threshold" min="50" max="98" step="1" value="85" oninput="document.getElementById('threshold-val').innerText = this.value + '%'" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+              <p class="text-[11px] text-slate-500 font-mono">Draft prompts must score at or above this percentage across executions to qualify for active promotion.</p>
+            </div>
+            
+            <div class="flex items-start justify-between border-t border-slate-900/60 pt-4">
+              <div class="space-y-0.5">
+                <label class="text-sm font-semibold text-slate-300">Require Human Evaluation</label>
+                <p class="text-xs text-slate-500 leading-normal pr-12">Prevent automatic promotion unless at least one execution has received manual satisfaction ratings from a developer.</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer mt-1">
+                <input type="checkbox" id="policy-require-human" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button onclick="saveAllPolicies()" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-sm font-semibold rounded-xl flex items-center space-x-2 transition-all shadow-lg shadow-purple-500/10">
+          <i data-lucide="check" class="h-4 w-4"></i>
+          <span>Save Policy Configuration</span>
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Execution Details Modal -->
+  <div id="execution-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+      <!-- Modal Header -->
+      <div class="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+        <div class="space-y-1">
+          <div class="flex items-center space-x-3">
+            <h3 class="font-title text-lg font-bold text-slate-200" id="modal-title">Session Telemetry</h3>
+            <span class="text-xs font-mono bg-slate-950 border border-slate-800 text-slate-400 px-2 py-0.5 rounded" id="modal-status">Finished</span>
+          </div>
+          <p class="text-xs text-slate-500 font-mono" id="modal-exec-id">ID: -</p>
+        </div>
+        <button onclick="closeModal('execution-modal')" class="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition-all">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
+      </div>
+      
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        <!-- Grid: Context Metadata -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-3 font-mono text-xs">
+            <h4 class="font-title text-sm font-semibold text-slate-300 font-sans">Context Metadata</h4>
+            <div class="bg-slate-950 border border-slate-950 rounded-xl p-4 space-y-2">
+              <div class="flex justify-between"><span class="text-slate-500">Repository</span><span class="text-slate-300 font-bold" id="modal-repo">-</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Branch</span><span class="text-slate-300" id="modal-branch">-</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Commit</span><span class="text-slate-300" id="modal-commit">-</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Task ID</span><span class="text-slate-300" id="modal-task-id">-</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Model</span><span class="text-slate-300" id="modal-model">-</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Time elapsed</span><span class="text-slate-300" id="modal-duration">-</span></div>
+            </div>
+          </div>
+          
+          <div class="space-y-3">
+            <h4 class="font-title text-sm font-semibold text-slate-300">Prompt Score Breakdown</h4>
+            <div class="glass-panel rounded-xl p-4 space-y-3">
+              <div class="flex justify-between items-center text-sm border-b border-slate-800 pb-2">
+                <span class="text-slate-400 font-medium">Session Score</span>
+                <span class="font-mono text-cyan-400 font-bold text-base" id="modal-overall-score">-</span>
+              </div>
+              <div class="space-y-2" id="modal-score-components">
+                <!-- Components -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Git Diffs and Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="space-y-3">
+            <h4 class="font-title text-sm font-semibold text-slate-300">File Modifications</h4>
+            <div class="bg-slate-950 border border-slate-950 rounded-xl p-4 max-h-[160px] overflow-y-auto space-y-1.5 font-mono text-[11px] text-slate-400" id="modal-files-changed">
+              <!-- Files list -->
+            </div>
+          </div>
+          
+          <div class="space-y-3">
+            <h4 class="font-title text-sm font-semibold text-slate-300">Claude Tool Calls</h4>
+            <div class="bg-slate-950 border border-slate-950 rounded-xl p-4 max-h-[160px] overflow-y-auto space-y-2 font-mono text-[11px] text-slate-400" id="modal-tool-usage">
+              <!-- Tool calls -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Evaluations side-by-side -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <!-- Human Rating -->
+          <div class="space-y-3">
+            <h4 class="font-title text-sm font-semibold text-slate-300 flex items-center space-x-1.5">
+              <i data-lucide="user" class="h-4 w-4 text-purple-400"></i>
+              <span>Human Evaluation</span>
+            </h4>
+            <div class="bg-slate-950/40 border border-slate-850 rounded-xl p-4 space-y-3" id="modal-human-eval-panel">
+              <!-- Rating grid -->
+            </div>
+          </div>
+          
+          <!-- AI Review -->
+          <div class="space-y-3">
+            <h4 class="font-title text-sm font-semibold text-slate-300 flex items-center space-x-1.5">
+              <i data-lucide="bot" class="h-4 w-4 text-cyan-400"></i>
+              <span>AI Judge Feedback</span>
+            </h4>
+            <div class="bg-slate-950/40 border border-slate-850 rounded-xl p-4 space-y-3" id="modal-ai-eval-panel">
+              <!-- Judge list -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create version modal -->
+  <div id="create-version-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+      <div class="flex justify-between items-center">
+        <h3 class="font-title text-lg font-bold text-slate-200">New Prompt Version Draft</h3>
+        <button onclick="closeModal('create-version-modal')" class="text-slate-400 hover:text-slate-200">
+          <i data-lucide="x" class="h-5.5 w-5.5"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-4">
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Changelog Description</label>
+          <input type="text" id="new-version-changelog" placeholder="e.g., Added rule to avoid legacy APIs" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500 font-mono">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Creator ID</label>
+          <input type="text" id="new-version-creator" placeholder="Developer email/ID" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500 font-mono">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Prompt Instructions</label>
+          <textarea id="new-version-content" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500 font-mono leading-relaxed" placeholder="Enter prompt instructions here..."></textarea>
+        </div>
+      </div>
+      
+      <div class="flex justify-end space-x-3">
+        <button onclick="closeModal('create-version-modal')" class="px-4 py-2 border border-slate-800 text-slate-400 hover:bg-slate-950 rounded-xl text-xs font-semibold">Cancel</button>
+        <button onclick="submitNewVersion()" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold">Create Version</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diff comparison Modal -->
+  <div id="diff-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-5xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+      <div class="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h3 class="font-title text-lg font-bold text-slate-200" id="diff-title">Prompt Version Comparison</h3>
+          <p class="text-xs text-slate-500 font-mono" id="diff-subtitle">Comparing Draft vs Active Version</p>
+        </div>
+        <button onclick="closeModal('diff-modal')" class="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition-all">
+          <i data-lucide="x" class="h-5 w-5"></i>
+        </button>
+      </div>
+      
+      <!-- Diff contents -->
+      <div class="flex-1 overflow-y-auto p-6 bg-slate-950 font-mono text-xs leading-relaxed space-y-1" id="diff-output-container">
+        <!-- Rendered Line Diffs -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-600 font-mono mt-8">
+    <div>PromptOps Telemetry Daemon Dashboard · Version 1.0.0</div>
+    <div class="text-[10px] text-slate-700 mt-1">Local Loopback Binding Active (ADR-0007 / 127.0.0.1)</div>
+  </footer>
+
+  <script>
+    // Tab switching state
+    let activeTab = 'overview';
+    
+    // Loaded Cache state
+    let promptCatalogCache = [];
+    let selectedPromptId = null;
+    let selectedVersionId = null;
+    
+    // Pagination for Executions
+    let currentExecutionsPage = 1;
+    let totalExecutionsPages = 1;
+    let filterRepoVal = '';
+    let filterStatusVal = '';
+
+    // Charts instances
+    let scoreChartInstance = null;
+    let buildChartInstance = null;
+
+    // Switch between dashboard sections
+    function switchTab(tabId) {
+      document.getElementById(`content-${activeTab}`).classList.add('hidden');
+      document.getElementById(`tab-${activeTab}`).className = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50";
+      
+      activeTab = tabId;
+      
+      document.getElementById(`content-${activeTab}`).classList.remove('hidden');
+      document.getElementById(`tab-${activeTab}`).className = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center space-x-2 bg-slate-900 text-purple-400 border border-slate-800";
+      
+      // Auto-load data based on tab
+      if (tabId === 'overview') {
+        fetchStats();
+      } else if (tabId === 'prompts') {
+        loadPromptsCatalog();
+      } else if (tabId === 'executions') {
+        loadExecutionsFeed(currentExecutionsPage);
+      } else if (tabId === 'settings') {
+        loadPolicySettings();
+      }
+    }
+
+    // Modal Helpers
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // Copy Prompt Text
+    function copyPromptText() {
+      const text = document.getElementById('detail-version-content').innerText;
+      navigator.clipboard.writeText(text);
+      
+      const copyBtn = document.querySelector('[onclick="copyPromptText()"] span');
+      const originalText = copyBtn.innerText;
+      copyBtn.innerText = "Copied!";
+      setTimeout(() => {
+        copyBtn.innerText = originalText;
+      }, 1500);
+    }
+
+    // Global loading refresh
+    function refreshAll() {
+      const icon = document.getElementById('refresh-icon');
+      icon.classList.add('animate-spin');
+      
+      if (activeTab === 'overview') {
+        fetchStats();
+      } else if (activeTab === 'prompts') {
+        loadPromptsCatalog();
+      } else if (activeTab === 'executions') {
+        loadExecutionsFeed(currentExecutionsPage);
+      } else if (activeTab === 'settings') {
+        loadPolicySettings();
+      }
+      
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+      }, 1000);
+    }
+
+    // API: Load Dashboard Statistics & Charts
+    async function fetchStats() {
+      try {
+        const statsRes = await fetch('/statistics');
+        const trendsRes = await fetch('/api/dashboard/stats-trends');
+        
+        if (!statsRes.ok || !trendsRes.ok) throw new Error('API fetch failed');
+        
+        const stats = await statsRes.json();
+        const trends = await trendsRes.json();
+        
+        // Populate stats cards
+        document.getElementById('stat-executions-count').innerText = stats.executions.totalCount;
+        document.getElementById('stat-average-score').innerText = stats.scores.averageOverallScore != null 
+          ? stats.scores.averageOverallScore.toFixed(1) + '%' 
+          : 'N/A';
+        document.getElementById('stat-prompts-count').innerText = stats.prompts.promptCount;
+        document.getElementById('stat-versions-count').innerText = stats.prompts.versionCount;
+        document.getElementById('stat-repos-count').innerText = Object.keys(stats.executions.countByRepository).length;
+
+        // Render Recent Sessions table in widget
+        const recentRes = await fetch('/api/dashboard/executions?page=1&pageSize=5');
+        if (recentRes.ok) {
+          const recentData = await recentRes.json();
+          renderOverviewTable(recentData.items);
+        }
+
+        // Render Charts
+        renderScoreChart(trends.scoreTrends);
+        renderBuildChart(trends.buildSuccessTrends);
+
+      } catch (err) {
+        console.error('Error fetching statistics', err);
+        document.getElementById('connection-status').className = "flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono";
+        document.getElementById('connection-status').innerHTML = '<span class="h-2 w-2 rounded-full bg-rose-500"></span><span>Offline</span>';
+      }
+    }
+
+    function renderOverviewTable(items) {
+      const body = document.getElementById('overview-executions-body');
+      if (!items || items.length === 0) {
+        body.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-600 font-mono">No tracked execution records in DB yet. Write some code!</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = items.map(item => {
+        const dateStr = new Date(item.timestamp).toLocaleString();
+        const statusColors = {
+          Finished: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30',
+          Running: 'bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse',
+          Failed: 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+        };
+        const statusClass = statusColors[item.status] || 'bg-slate-800 text-slate-400';
+        
+        return `
+          <tr class="hover:bg-slate-900/30 transition-all cursor-pointer" onclick="showExecutionDetails('${item.id}')">
+            <td class="py-4 px-4 font-mono text-xs">
+              <span class="text-slate-300 font-semibold block max-w-[200px] truncate">${item.repository}</span>
+              <span class="text-slate-500 block max-w-[200px] truncate">${item.branch || 'no branch'}</span>
+            </td>
+            <td class="py-4 px-4 font-medium text-slate-300">
+              ${item.promptName} <span class="text-xs text-slate-500 font-mono">v${item.promptVersionNumber}</span>
+            </td>
+            <td class="py-4 px-4 font-mono text-xs text-slate-400">
+              ${item.commit ? item.commit.substring(0, 7) : 'n/a'}
+            </td>
+            <td class="py-4 px-4 font-mono text-xs text-slate-400">
+              +${item.linesAdded} / -${item.linesDeleted} lines
+            </td>
+            <td class="py-4 px-4 text-right">
+              <span class="px-2.5 py-1 rounded text-xs ${statusClass}">${item.status}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderScoreChart(trends) {
+      const ctx = document.getElementById('scoreChart').getContext('2d');
+      if (scoreChartInstance) scoreChartInstance.destroy();
+
+      if (!trends || trends.length === 0) {
+        trends = [
+          { date: 'No Data', averageScore: 0 }
+        ];
+      }
+
+      scoreChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: trends.map(t => t.date),
+          datasets: [{
+            label: 'Average Score (%)',
+            data: trends.map(t => t.averageScore),
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.05)',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true,
+            pointBackgroundColor: '#a855f7',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.03)' },
+              ticks: { color: '#64748b', font: { family: 'Courier New' } }
+            },
+            y: {
+              min: 0,
+              max: 100,
+              grid: { color: 'rgba(255, 255, 255, 0.03)' },
+              ticks: { color: '#64748b', stepSize: 20 }
+            }
+          }
+        }
+      });
+    }
+
+    function renderBuildChart(trends) {
+      const ctx = document.getElementById('buildChart').getContext('2d');
+      if (buildChartInstance) buildChartInstance.destroy();
+
+      if (!trends || trends.length === 0) {
+        trends = [
+          { date: 'No Data', buildSuccessRate: 0 }
+        ];
+      }
+
+      buildChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: trends.map(t => t.date),
+          datasets: [{
+            label: 'Build Success (%)',
+            data: trends.map(t => t.buildSuccessRate),
+            backgroundColor: 'rgba(6, 182, 212, 0.35)',
+            borderColor: '#06b6d4',
+            borderWidth: 1.5,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#64748b', font: { family: 'Courier New' } }
+            },
+            y: {
+              min: 0,
+              max: 100,
+              grid: { color: 'rgba(255, 255, 255, 0.03)' },
+              ticks: { color: '#64748b' }
+            }
+          }
+        }
+      });
+    }
+
+    // API: Load Prompts Catalog
+    async function loadPromptsCatalog() {
+      try {
+        const res = await fetch('/api/dashboard/prompts');
+        if (!res.ok) throw new Error('Failed to fetch catalog');
+        
+        promptCatalogCache = await res.json();
+        document.getElementById('prompt-count-badge').innerText = promptCatalogCache.length;
+
+        renderPromptsList();
+        
+        // Re-focus details if selected prompt still exists
+        if (selectedPromptId) {
+          showPromptDetails(selectedPromptId);
+        }
+
+      } catch (err) {
+        console.error('Error fetching prompts', err);
+      }
+    }
+
+    function renderPromptsList() {
+      const container = document.getElementById('prompts-list-container');
+      if (promptCatalogCache.length === 0) {
+        container.innerHTML = `<div class="py-12 text-center text-slate-600 font-mono">No prompts registered yet. Run "/promptops init" to seed the catalog.</div>`;
+        return;
+      }
+
+      container.innerHTML = promptCatalogCache.map(p => {
+        const isActive = p.Id === selectedPromptId;
+        const activeClass = isActive 
+          ? 'border-purple-500/50 bg-purple-500/5 shadow-lg shadow-purple-500/5' 
+          : 'border-slate-800/60 hover:bg-slate-900/20';
+
+        const scoreBadge = p.ActiveVersionScore != null 
+          ? `<span class="px-2 py-0.5 text-xs font-bold font-mono rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">${p.ActiveVersionScore.toFixed(0)}%</span>`
+          : `<span class="px-2 py-0.5 text-xs font-mono rounded bg-slate-900 text-slate-500 border border-slate-800">Unscored</span>`;
+
+        return `
+          <div onclick="showPromptDetails('${p.Id}')" class="glass-panel rounded-xl p-4 cursor-pointer border transition-all duration-200 select-none ${activeClass}">
+            <div class="flex justify-between items-start mb-2">
+              <h4 class="font-title font-bold text-slate-200 tracking-tight">${p.Name}</h4>
+              ${scoreBadge}
+            </div>
+            <p class="text-xs text-slate-400 leading-normal line-clamp-2">${p.Description || 'No description available.'}</p>
+            <div class="flex items-center justify-between mt-3 text-[10px] text-slate-500 font-mono">
+              <span class="bg-slate-950 px-1.5 py-0.5 border border-slate-900 rounded">v${p.ActiveVersionNumber || 'Draft'} Active</span>
+              <span>${p.VersionCount} version${p.VersionCount > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function showPromptDetails(promptId) {
+      selectedPromptId = promptId;
+      
+      // Refresh highlighted list border without full reload
+      renderPromptsList();
+
+      const prompt = promptCatalogCache.find(p => p.Id === promptId);
+      if (!prompt) return;
+
+      document.getElementById('prompt-detail-empty').classList.add('hidden');
+      document.getElementById('prompt-detail-container').classList.remove('hidden');
+
+      document.getElementById('detail-prompt-name').innerText = prompt.Name;
+      document.getElementById('detail-prompt-id').innerText = prompt.Id;
+      document.getElementById('detail-prompt-desc').innerText = prompt.Description;
+      
+      // Render Tags
+      const tagsContainer = document.getElementById('detail-prompt-tags');
+      tagsContainer.innerHTML = prompt.Tags.map(t => 
+        `<span class="px-2 py-0.5 text-[10px] uppercase font-mono font-bold tracking-wider rounded-full bg-slate-900 border border-slate-800 text-slate-400">${t}</span>`
+      ).join('') || `<span class="text-xs text-slate-600 font-mono italic">No tags associated</span>`;
+
+      // Render Versions table/list
+      const versionsContainer = document.getElementById('detail-versions-list');
+      versionsContainer.innerHTML = prompt.Versions.map(v => {
+        const isSelected = v.Id === selectedVersionId;
+        const selectedClass = isSelected 
+          ? 'border-purple-500/40 bg-purple-950/20' 
+          : 'border-slate-800 hover:bg-slate-900/30';
+
+        const statusBadges = {
+          Active: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+          Draft: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+          Deprecated: 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+        };
+        const statusClass = statusBadges[v.Status] || 'bg-slate-800 text-slate-500';
+
+        const promoteAction = v.Status === 'Draft' 
+          ? `<button onclick="promoteVersion('${prompt.Id}', '${v.Id}', event)" class="px-2 py-0.5 rounded text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all">Promote</button>`
+          : '';
+
+        return `
+          <div onclick="selectVersion('${v.Id}')" class="flex justify-between items-center p-3 border rounded-lg cursor-pointer transition-all duration-200 select-none ${selectedClass}">
+            <div class="space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="font-mono text-xs text-slate-300 font-bold">Version ${v.VersionNumber}</span>
+                <span class="text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold uppercase tracking-wider ${statusClass}">${v.Status}</span>
+              </div>
+              <div class="text-[10px] text-slate-500 font-mono">
+                Created by ${v.CreatedBy || 'Unknown'} · ${new Date(v.CreatedAt).toLocaleDateString()}
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+              <span class="font-mono text-sm font-bold text-slate-300">${v.Score != null ? v.Score.toFixed(0) + '%' : 'N/A'}</span>
+              ${promoteAction}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Auto-select latest or active version on first view
+      if (!selectedVersionId || !prompt.Versions.some(v => v.Id === selectedVersionId)) {
+        const defaultVer = prompt.Versions.find(v => v.Status === 'Active') || prompt.Versions[0];
+        if (defaultVer) selectVersion(defaultVer.Id);
+      } else {
+        selectVersion(selectedVersionId);
+      }
+    }
+
+    function selectVersion(versionId) {
+      selectedVersionId = versionId;
+      
+      // Update styling in the list
+      const prompt = promptCatalogCache.find(p => p.Id === selectedPromptId);
+      if (!prompt) return;
+
+      // Update detail border highlights
+      showPromptDetails(selectedPromptId);
+
+      const version = prompt.Versions.find(v => v.Id === versionId);
+      if (!version) return;
+
+      // Populate text panel
+      document.getElementById('detail-version-content').innerText = version.Content;
+      
+      // Show/Hide Compare with Active button
+      const activeVer = prompt.Versions.find(v => v.Status === 'Active');
+      const btnCompare = document.getElementById('btn-compare-active');
+      if (activeVer && activeVer.Id !== version.Id) {
+        btnCompare.classList.remove('hidden');
+      } else {
+        btnCompare.classList.add('hidden');
+      }
+
+      // Populate analytics box
+      document.getElementById('analytics-version-tag').innerText = `Version ${version.VersionNumber}`;
+      document.getElementById('analytics-score').innerText = version.Score != null 
+        ? version.Score.toFixed(1) + '%' 
+        : 'No Score';
+      document.getElementById('analytics-score').className = version.Score != null
+        ? "font-mono font-bold text-lg text-purple-400"
+        : "font-mono font-bold text-lg text-slate-500";
+
+      const compContainer = document.getElementById('analytics-components-container');
+      if (!version.ComponentScores || Object.keys(version.ComponentScores).length === 0) {
+        compContainer.innerHTML = `<div class="text-[11px] font-mono text-slate-600 italic py-2">No components evaluations evaluated yet. Run rates/builds to calculate stats.</div>`;
+        return;
+      }
+
+      compContainer.innerHTML = Object.entries(version.ComponentScores).map(([key, val]) => {
+        const pct = val * 100;
+        return `
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] font-mono">
+              <span class="text-slate-400 capitalize">${key.replace(/([A-Z])/g, ' $1')}</span>
+              <span class="text-slate-200">${pct.toFixed(0)}%</span>
+            </div>
+            <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+              <div class="h-full bg-purple-500" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function promoteVersion(promptId, versionId, event) {
+      event.stopPropagation(); // prevent selectVersion trigger
+      
+      if (!confirm("Are you sure you want to manually promote this version to Active?")) return;
+
+      try {
+        const res = await fetch(`/prompts/${promptId}/versions/${versionId}/activate`, {
+          method: 'POST'
+        });
+        if (!res.ok) throw new Error('Activation failed');
+        
+        loadPromptsCatalog();
+      } catch (err) {
+        alert("Failed to promote version: " + err.message);
+      }
+    }
+
+    // Modal Draft prompt submission
+    function openCreateVersionModal() {
+      const prompt = promptCatalogCache.find(p => p.Id === selectedPromptId);
+      if (!prompt) return;
+      
+      document.getElementById('new-version-changelog').value = '';
+      document.getElementById('new-version-creator').value = 'Developer';
+      
+      // Seed text area with currently selected content as starting point
+      const currentText = document.getElementById('detail-version-content').innerText;
+      document.getElementById('new-version-content').value = currentText;
+
+      openModal('create-version-modal');
+    }
+
+    async function submitNewVersion() {
+      const changelog = document.getElementById('new-version-changelog').value;
+      const creator = document.getElementById('new-version-creator').value;
+      const content = document.getElementById('new-version-content').value;
+
+      if (!content.trim()) {
+        alert("Prompt instructions content cannot be empty.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/prompts/${selectedPromptId}/versions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content,
+            createdBy: creator || 'Developer',
+            changelogEntry: changelog || null
+          })
+        });
+
+        if (!res.ok) throw new Error('Create failed');
+        
+        const newVer = await res.json();
+        selectedVersionId = newVer.id; // auto-select newly created version
+        closeModal('create-version-modal');
+        loadPromptsCatalog();
+
+      } catch (err) {
+        alert("Failed to save draft: " + err.message);
+      }
+    }
+
+    // Diff compare algorithm
+    function compareWithActive() {
+      const prompt = promptCatalogCache.find(p => p.Id === selectedPromptId);
+      if (!prompt) return;
+
+      const activeVer = prompt.Versions.find(v => v.Status === 'Active');
+      const selectedVer = prompt.Versions.find(v => v.Id === selectedVersionId);
+
+      if (!activeVer || !selectedVer) return;
+
+      document.getElementById('diff-subtitle').innerText = `Comparing Version ${selectedVer.VersionNumber} (Selected) vs Version ${activeVer.VersionNumber} (Active)`;
+      
+      // Calculate diffs
+      const diff = Diff.diffLines(activeVer.Content, selectedVer.Content);
+      const container = document.getElementById('diff-output-container');
+      
+      container.innerHTML = diff.map(part => {
+        // green for additions, red for deletions, grey for unchanged
+        const colorClass = part.added 
+          ? 'bg-emerald-950/40 text-emerald-400 border-l-2 border-emerald-500 pl-2' 
+          : part.removed 
+            ? 'bg-rose-950/40 text-rose-400 border-l-2 border-rose-500 pl-2 line-through' 
+            : 'text-slate-400 pl-2 opacity-70';
+            
+        return `<div class="${colorClass}">${escapeHtml(part.value)}</div>`;
+      }).join('');
+
+      openModal('diff-modal');
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // API: Load Execution Telemetry log
+    async function loadExecutionsFeed(page) {
+      currentExecutionsPage = page;
+      try {
+        let url = `/api/dashboard/executions?page=${page}&pageSize=10`;
+        if (filterRepoVal) url += `&repository=${encodeURIComponent(filterRepoVal)}`;
+        if (filterStatusVal) url += `&status=${encodeURIComponent(filterStatusVal)}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('API failed');
+
+        const data = await res.json();
+        renderLogTable(data.items);
+
+        // Update footer pagination
+        totalExecutionsPages = Math.max(1, Math.ceil(data.totalCount / data.pageSize));
+        document.getElementById('paging-current').innerText = data.page;
+        document.getElementById('paging-total').innerText = totalExecutionsPages;
+        document.getElementById('paging-total-items').innerText = data.totalCount;
+
+        document.getElementById('btn-page-prev').disabled = data.page <= 1;
+        document.getElementById('btn-page-next').disabled = data.page >= totalExecutionsPages;
+
+      } catch (err) {
+        console.error('Error fetching logs', err);
+      }
+    }
+
+    function renderLogTable(items) {
+      const body = document.getElementById('executions-log-body');
+      if (!items || items.length === 0) {
+        body.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-500 font-mono">No executions found matching the current filter filters.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = items.map(item => {
+        const dateStr = new Date(item.timestamp).toLocaleString();
+        const durationStr = item.executionTimeMs != null 
+          ? (item.executionTimeMs / 1000).toFixed(1) + 's' 
+          : '-';
+        
+        const statusColors = {
+          Finished: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30',
+          Running: 'bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse',
+          Failed: 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+        };
+        const statusClass = statusColors[item.status] || 'bg-slate-800 text-slate-400';
+
+        return `
+          <tr class="hover:bg-slate-900/35 transition-all">
+            <td class="py-4 px-6 font-mono text-xs">
+              <span class="text-slate-300 font-bold block max-w-[220px] truncate" title="${item.repository}">${item.repository}</span>
+              <span class="text-slate-500 block max-w-[220px] truncate" title="${item.branch}">${item.branch || 'no branch'}</span>
+            </td>
+            <td class="py-4 px-6">
+              <span class="text-slate-300 block font-semibold">${item.promptName}</span>
+              <span class="text-xs text-slate-500 font-mono">version ${item.promptVersionNumber}</span>
+            </td>
+            <td class="py-4 px-6 font-mono text-xs text-slate-400">
+              ${item.commit ? item.commit.substring(0, 7) : 'n/a'}
+            </td>
+            <td class="py-4 px-6 font-mono text-xs text-slate-400">
+              ${durationStr}
+            </td>
+            <td class="py-4 px-6 font-mono text-xs text-slate-400">
+              +${item.linesAdded} / -${item.linesDeleted} lines
+            </td>
+            <td class="py-4 px-6 text-slate-400 text-xs">
+              ${dateStr}
+            </td>
+            <td class="py-4 px-6 text-right">
+              <button onclick="showExecutionDetails('${item.id}')" class="px-3 py-1 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 hover:text-slate-100 rounded text-xs transition-all font-mono">Inspect</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Table paging
+    function changePage(direction) {
+      const targetPage = currentExecutionsPage + direction;
+      if (targetPage >= 1 && targetPage <= totalExecutionsPages) {
+        loadExecutionsFeed(targetPage);
+      }
+    }
+
+    // Paged Table Filters debounce
+    let filterDebounceTimer;
+    function debounceFilter() {
+      clearTimeout(filterDebounceTimer);
+      filterDebounceTimer = setTimeout(() => {
+        applyFilters();
+      }, 350);
+    }
+
+    function applyFilters() {
+      filterRepoVal = document.getElementById('filter-repo').value.trim();
+      filterStatusVal = document.getElementById('filter-status').value;
+      loadExecutionsFeed(1);
+    }
+
+    // Modal: Detailed Telemetry Inspector
+    async function showExecutionDetails(id) {
+      try {
+        const res = await fetch(`/api/dashboard/executions/${id}`);
+        if (!res.ok) throw new Error('Load failed');
+        
+        const details = await res.json();
+        
+        document.getElementById('modal-exec-id').innerText = `ID: ${details.id}`;
+        document.getElementById('modal-title').innerText = `${details.promptName} (v${details.promptVersionNumber})`;
+        document.getElementById('modal-status').innerText = details.status;
+        
+        const statusColors = {
+          Finished: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30',
+          Running: 'bg-amber-500/10 text-amber-400 border border-amber-500/30',
+          Failed: 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+        };
+        document.getElementById('modal-status').className = `text-[10px] font-mono px-2 py-0.5 rounded ${statusColors[details.status] || 'bg-slate-800 text-slate-400'}`;
+
+        // Populate context block
+        document.getElementById('modal-repo').innerText = details.repository;
+        document.getElementById('modal-branch').innerText = details.branch || 'no branch';
+        document.getElementById('modal-commit').innerText = details.commit ? details.commit.substring(0, 12) : 'n/a';
+        document.getElementById('modal-task-id').innerText = details.taskId || 'n/a';
+        document.getElementById('modal-model').innerText = details.model || 'n/a';
+        document.getElementById('modal-duration').innerText = details.executionTimeMs != null 
+          ? (details.executionTimeMs / 1000).toFixed(1) + ' seconds' 
+          : 'n/a';
+
+        // Render Score Breakdown
+        const scoreVal = document.getElementById('modal-overall-score');
+        const scoreComponents = document.getElementById('modal-score-components');
+        if (details.score) {
+          scoreVal.innerText = details.score.overallScore.toFixed(1) + '%';
+          scoreComponents.innerHTML = Object.entries(details.score.componentScores).map(([key, val]) => {
+            const pct = val * 100;
+            return `
+              <div class="space-y-1">
+                <div class="flex justify-between text-[11px] font-mono">
+                  <span class="text-slate-400 capitalize">${key.replace(/([A-Z])/g, ' $1')}</span>
+                  <span class="text-slate-200">${pct.toFixed(0)}%</span>
+                </div>
+                <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                  <div class="h-full bg-purple-500" style="width: ${pct}%"></div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          scoreVal.innerText = 'Unscored';
+          scoreComponents.innerHTML = `<div class="text-xs text-slate-500 font-mono italic text-center py-4">No aggregated score calculated. Requires evaluations.</div>`;
+        }
+
+        // Render Files modified
+        const filesContainer = document.getElementById('modal-files-changed');
+        if (details.filesChanged && details.filesChanged.length > 0) {
+          filesContainer.innerHTML = `
+            <div class="text-[10px] text-slate-500 mb-1 border-b border-slate-900 pb-1">
+              Lines Added: ${details.linesAdded} · Lines Deleted: ${details.linesDeleted}
+            </div>
+            ${details.filesChanged.map(f => `<div class="truncate text-[10px] text-slate-400"><span class="text-slate-500">M</span> ${f}</div>`).join('')}
+          `;
+        } else {
+          filesContainer.innerHTML = `<div class="text-xs text-slate-600 italic text-center py-4">No file changes recorded for this session.</div>`;
+        }
+
+        // Render tool calls
+        const toolsContainer = document.getElementById('modal-tool-usage');
+        if (details.toolUsage && details.toolUsage.length > 0) {
+          toolsContainer.innerHTML = details.toolUsage.map(t => {
+            const secs = (t.durationMs / 1000).toFixed(2);
+            return `<div class="flex justify-between"><span>${t.name} (x${t.count})</span><span class="text-slate-500">${secs}s</span></div>`;
+          }).join('');
+        } else {
+          toolsContainer.innerHTML = `<div class="text-xs text-slate-600 italic text-center py-4">No assistant tool call metrics recorded.</div>`;
+        }
+
+        // Render Human Evaluations
+        const humanPanel = document.getElementById('modal-human-eval-panel');
+        if (details.humanEvaluation) {
+          const eval = details.humanEvaluation;
+          humanPanel.innerHTML = `
+            <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+              <div class="bg-slate-950 p-2 rounded"><span class="text-slate-500 block text-[9px]">Correctness</span><span class="text-slate-300 font-bold">${eval.correctness}/5</span></div>
+              <div class="bg-slate-950 p-2 rounded"><span class="text-slate-500 block text-[9px]">Helpfulness</span><span class="text-slate-300 font-bold">${eval.helpfulness}/5</span></div>
+              <div class="bg-slate-950 p-2 rounded"><span class="text-slate-500 block text-[9px]">Architecture</span><span class="text-slate-300 font-bold">${eval.architecture}/5</span></div>
+              <div class="bg-slate-950 p-2 rounded"><span class="text-slate-500 block text-[9px]">Readability</span><span class="text-slate-300 font-bold">${eval.readability}/5</span></div>
+              <div class="bg-slate-950 p-2 rounded"><span class="text-slate-500 block text-[9px]">Completeness</span><span class="text-slate-300 font-bold">${eval.completeness}/5</span></div>
+              <div class="bg-slate-950 p-2 rounded"><span class="text-slate-500 block text-[9px]">Hallucinations</span><span class="text-slate-300 font-bold">${eval.hallucinations ? 'Yes' : 'No'}</span></div>
+            </div>
+            <div class="bg-slate-950 p-2.5 rounded text-xs">
+              <span class="text-slate-500 block text-[9px] font-mono">Notes</span>
+              <p class="text-slate-300 mt-1 italic">${eval.notes || 'No evaluator comments submitted.'}</p>
+            </div>
+          `;
+        } else {
+          humanPanel.innerHTML = `<div class="text-xs text-slate-500 italic text-center py-6">No satisfaction ratings submitted. Run "/promptops rate" to evaluate.</div>`;
+        }
+
+        // Render AI Evaluations
+        const aiPanel = document.getElementById('modal-ai-eval-panel');
+        if (details.aiEvaluation) {
+          const eval = details.aiEvaluation;
+          const satisfiesClass = eval.satisfiesAcceptanceCriteria === true 
+            ? 'text-emerald-400 bg-emerald-950/20 border border-emerald-900/30' 
+            : eval.satisfiesAcceptanceCriteria === false 
+              ? 'text-rose-400 bg-rose-950/20 border border-rose-900/30'
+              : 'text-slate-500 bg-slate-950';
+
+          aiPanel.innerHTML = `
+            <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded text-xs font-mono">
+              <span class="text-slate-400">Acceptance Criteria met</span>
+              <span class="px-2 py-0.5 rounded text-[10px] ${satisfiesClass}">${eval.satisfiesAcceptanceCriteria === true ? 'Satisfied' : eval.satisfiesAcceptanceCriteria === false ? 'Violated' : 'Unspecified'}</span>
+            </div>
+            
+            <div class="space-y-2">
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider font-mono font-bold">Suggested Prompt Improvements</span>
+              <ul class="text-xs text-slate-300 space-y-1 list-disc pl-4 leading-normal">
+                ${eval.suggestedPromptImprovements && eval.suggestedPromptImprovements.length > 0
+                  ? eval.suggestedPromptImprovements.map(item => `<li>${item}</li>`).join('')
+                  : '<li class="text-slate-500 italic list-none">No prompt flaws identified.</li>'}
+              </ul>
+            </div>
+
+            <div class="space-y-2 pt-1">
+              <span class="text-[10px] text-slate-500 uppercase tracking-wider font-mono font-bold">Guidelines / ADR Violations</span>
+              <ul class="text-xs text-slate-300 space-y-1 list-disc pl-4 leading-normal">
+                ${eval.adrViolations && eval.adrViolations.length > 0
+                  ? eval.adrViolations.map(item => `<li class="text-amber-400">${item}</li>`).join('')
+                  : '<li class="text-slate-500 italic list-none">No architectural standard violations.</li>'}
+              </ul>
+            </div>
+          `;
+        } else {
+          aiPanel.innerHTML = `<div class="text-xs text-slate-500 italic text-center py-6">No automated judge evaluations recorded. Run "/promptops evaluate".</div>`;
+        }
+
+        openModal('execution-modal');
+        lucide.createIcons(); // render loaded icons in modals
+
+      } catch (err) {
+        alert("Failed to inspect details: " + err.message);
+      }
+    }
+
+    // Policy Configuration management
+    async function loadPolicySettings() {
+      try {
+        const evalRes = await fetch('/ai-evaluation-policy');
+        const promoteRes = await fetch('/promotion-policy');
+        
+        if (!evalRes.ok || !promoteRes.ok) throw new Error('Settings APIs failed');
+
+        const evalPolicy = await evalRes.json();
+        const promotePolicy = await promoteRes.json();
+
+        // Populate controls
+        document.getElementById('policy-ai-eval').checked = evalPolicy.autoEvaluateOnFinish;
+        document.getElementById('policy-auto-promote').checked = promotePolicy.autoPromotionEnabled;
+        document.getElementById('policy-threshold').value = promotePolicy.minimumScoreThreshold;
+        document.getElementById('threshold-val').innerText = promotePolicy.minimumScoreThreshold + '%';
+        document.getElementById('policy-require-human').checked = promotePolicy.requireHumanEvaluation;
+
+      } catch (err) {
+        console.error('Error fetching policies', err);
+      }
+    }
+
+    async function saveAllPolicies() {
+      const autoEval = document.getElementById('policy-ai-eval').checked;
+      const autoPromote = document.getElementById('policy-auto-promote').checked;
+      const threshold = parseFloat(document.getElementById('policy-threshold').value);
+      const requireHuman = document.getElementById('policy-require-human').checked;
+
+      try {
+        const evalRes = await fetch('/ai-evaluation-policy', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ autoEvaluateOnFinish: autoEval })
+        });
+
+        const promoteRes = await fetch('/promotion-policy', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            autoPromotionEnabled: autoPromote,
+            minimumScoreThreshold: threshold,
+            requireHumanEvaluation: requireHuman,
+            minimumMarginOverActive: null
+          })
+        });
+
+        if (!evalRes.ok || !promoteRes.ok) throw new Error('Save policy API failed');
+
+        alert("Policy settings saved successfully!");
+        loadPolicySettings();
+
+      } catch (err) {
+        alert("Failed to save policy parameters: " + err.message);
+      }
+    }
+
+    // Bootstrapping initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchStats();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
