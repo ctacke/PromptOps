@@ -35,5 +35,8 @@ internal sealed class FakeMutablePromptRepository : IPromptRepository
     public Task<IReadOnlyList<PromptSummary>> GetAllNamesAsync(CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<PromptSummary>>(_prompts.Values.Select(p => new PromptSummary(p.Id, p.Name)).ToList());
 
+    public Task<PromptStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

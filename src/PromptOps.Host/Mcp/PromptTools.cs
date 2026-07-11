@@ -55,4 +55,26 @@ public sealed class PromptTools(PromptService service)
 
         return new { metadata.PromptId, metadata.Name, metadata.Metadata.Description, metadata.Metadata.Tags };
     }
+
+    [McpServerTool(Name = "get_prompt_version_content")]
+    [Description("Gets a specific PromptVersion's actual content/text, along with its status and owning prompt's name/tags. Use this after recommend_prompt (or list_prompts + get_prompt) to see what a prompt version actually says, not just its id.")]
+    public async Task<object?> GetPromptVersionContent(
+        [Description("The prompt version's id.")] Guid promptVersionId,
+        CancellationToken cancellationToken = default)
+    {
+        var detail = await service.GetVersionDetailAsync(promptVersionId, cancellationToken);
+        if (detail is null)
+            return null;
+
+        return new
+        {
+            detail.PromptId,
+            detail.PromptName,
+            detail.VersionId,
+            detail.VersionNumber,
+            detail.Content,
+            Status = detail.Status.ToString(),
+            detail.Tags
+        };
+    }
 }

@@ -15,5 +15,8 @@ public interface IExecutionRepository
     /// <summary>Stages changes made to a previously-loaded aggregate. Call <see cref="SaveChangesAsync"/> to commit.</summary>
     Task UpdateAsync(ExecutionRecord execution, CancellationToken cancellationToken = default);
 
+    /// <summary>Aggregate execution counts (by status, by repository), computed in SQL — never materializes full <see cref="ExecutionRecord"/> aggregates.</summary>
+    Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -59,6 +59,30 @@ public sealed class ExecutionRepository(PromptOpsDbContext db) : IExecutionRepos
         return Task.CompletedTask;
     }
 
+    public async Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default)
+    {
+        // Both breakdowns computed in SQL (GROUP BY) — never materializes an ExecutionRecordEntity,
+        // let alone the full domain aggregate with its tool-usage collection.
+        var totalCount = await db.Executions.AsNoTracking().CountAsync(cancellationToken);
+
+        var byStatus = await db.Executions
+            .AsNoTracking()
+            .GroupBy(e => e.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var byRepository = await db.Executions
+            .AsNoTracking()
+            .GroupBy(e => e.Repository)
+            .Select(g => new { Repository = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return new ExecutionStatistics(
+            totalCount,
+            byStatus.ToDictionary(x => x.Status, x => x.Count),
+            byRepository.ToDictionary(x => x.Repository, x => x.Count));
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => db.SaveChangesAsync(cancellationToken);
 

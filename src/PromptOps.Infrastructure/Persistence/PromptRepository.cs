@@ -124,6 +124,25 @@ public sealed class PromptRepository(PromptOpsDbContext db) : IPromptRepository
         return summaries;
     }
 
+    public async Task<PromptStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default)
+    {
+        // Both counts computed in SQL (COUNT/GROUP BY) — never materializes a Prompt or
+        // PromptVersion entity, same discipline as GetAllNamesAsync/GetMetadataAsync.
+        var promptCount = await db.Prompts.AsNoTracking().CountAsync(cancellationToken);
+
+        var versionStatusCounts = await db.Prompts
+            .AsNoTracking()
+            .SelectMany(p => p.Versions)
+            .GroupBy(v => v.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var versionCount = versionStatusCounts.Sum(x => x.Count);
+        var byStatus = versionStatusCounts.ToDictionary(x => x.Status, x => x.Count);
+
+        return new PromptStatistics(promptCount, versionCount, byStatus);
+    }
+
     /// <summary>Loads the full <see cref="Prompt"/> aggregate that owns the given version — used by <c>AutoPromotionTrigger</c> (Phase 11), which only has a <c>PromptVersionId</c> to start from.</summary>
     public async Task<Prompt?> GetByVersionIdAsync(Guid versionId, CancellationToken cancellationToken = default)
     {

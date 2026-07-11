@@ -27,6 +27,9 @@ public sealed class AIEvaluationRepository(PromptOpsDbContext db) : IAIEvaluatio
         return entities.OrderBy(e => e.Timestamp).Select(AIEvaluationMapper.ToDomain).ToList();
     }
 
+    public Task<int> GetCountAsync(CancellationToken cancellationToken = default)
+        => db.AIEvaluations.AsNoTracking().CountAsync(cancellationToken);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => db.SaveChangesAsync(cancellationToken);
 }

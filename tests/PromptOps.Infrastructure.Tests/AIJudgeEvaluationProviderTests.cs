@@ -166,6 +166,8 @@ public class AIJudgeEvaluationProviderTests
             return Task.CompletedTask;
         }
 
+        public Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

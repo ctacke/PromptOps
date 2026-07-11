@@ -131,6 +131,33 @@ public class PromptEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     }
 
     [Fact]
+    public async Task Get_Prompt_Version_Returns_Its_Content()
+    {
+        var createResponse = await _client.PostAsJsonAsync("/prompts", new { name = "Fix a Bug", metadata = new { tags = new[] { "debugging" } } });
+        var prompt = await createResponse.Content.ReadFromJsonAsync<PromptResponse>();
+        var versionResponse = await _client.PostAsJsonAsync($"/prompts/{prompt!.Id}/versions", new { content = "Investigate and fix the bug.", createdBy = "alice" });
+        var version = await versionResponse.Content.ReadFromJsonAsync<PromptVersionResponse>();
+
+        var response = await _client.GetAsync($"/prompt-versions/{version!.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var detail = await response.Content.ReadFromJsonAsync<PromptVersionDetailResponse>();
+        Assert.Equal(prompt.Id, detail!.PromptId);
+        Assert.Equal("Fix a Bug", detail.PromptName);
+        Assert.Equal("Investigate and fix the bug.", detail.Content);
+        Assert.Equal(PromptVersionStatus.Draft, detail.Status);
+        Assert.Contains("debugging", detail.Tags);
+    }
+
+    [Fact]
+    public async Task Get_Prompt_Version_Returns_NotFound_For_An_Unknown_Version()
+    {
+        var response = await _client.GetAsync($"/prompt-versions/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_Version_Returns_BadRequest_For_Empty_Content()
     {
         var createResponse = await _client.PostAsJsonAsync("/prompts", new { name = "Fix a bug", metadata = (object?)null });
@@ -197,4 +224,6 @@ public class PromptEndpointsTests : IClassFixture<WebApplicationFactory<Program>
     private sealed record PromptMetadataResponse(Guid Id, string Name, PromptMetadataDto Metadata);
 
     private sealed record PromptVersionResponse(Guid Id, Guid PromptId, int VersionNumber, string Content, string? ChangelogEntry, PromptVersionStatus Status, DateTimeOffset CreatedAt);
+
+    private sealed record PromptVersionDetailResponse(Guid PromptId, string PromptName, Guid VersionId, int VersionNumber, string Content, PromptVersionStatus Status, IReadOnlyList<string> Tags);
 }

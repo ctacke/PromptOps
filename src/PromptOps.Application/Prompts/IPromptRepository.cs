@@ -24,5 +24,8 @@ public interface IPromptRepository
     /// <summary>Every prompt's id and name only — used to check for existing names (e.g. <c>/promptops init</c>'s de-dup check) without loading metadata or version content.</summary>
     Task<IReadOnlyList<PromptSummary>> GetAllNamesAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Aggregate prompt/version counts, computed in SQL — never loads content or full aggregates.</summary>
+    Task<PromptStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -25,6 +25,8 @@ internal sealed class FakePromptRepository : IPromptRepository
 
     public Task<IReadOnlyList<PromptSummary>> GetAllNamesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+    public Task<PromptStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
@@ -46,6 +48,7 @@ internal sealed class FakeExecutionRepository : IExecutionRepository
         => Task.FromResult<IReadOnlyList<ExecutionRecord>>(_byPromptVersion.GetValueOrDefault(promptVersionId) ?? []);
 
     public Task UpdateAsync(ExecutionRecord execution, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
@@ -67,6 +70,8 @@ internal sealed class FakePromptScoreRepository : IPromptScoreRepository
         var scores = _byPromptVersion.GetValueOrDefault(promptVersionId) ?? [];
         return Task.FromResult<IReadOnlyList<PromptScore>>(scores.OrderBy(s => s.ComputedAt).ToList());
     }
+
+    public Task<ScoreStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

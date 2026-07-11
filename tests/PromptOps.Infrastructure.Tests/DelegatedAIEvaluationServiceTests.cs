@@ -150,6 +150,8 @@ public class DelegatedAIEvaluationServiceTests
             return Task.CompletedTask;
         }
 
+        public Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
@@ -165,6 +167,8 @@ public class DelegatedAIEvaluationServiceTests
 
         public Task<IReadOnlyList<AIEvaluation>> GetByExecutionIdAsync(Guid executionId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AIEvaluation>>(Added.Where(e => e.ExecutionId == executionId).ToList());
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

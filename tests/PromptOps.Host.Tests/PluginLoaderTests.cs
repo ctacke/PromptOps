@@ -98,6 +98,7 @@ public sealed class PluginLoaderTests : IDisposable
         public Task<ExecutionRecord?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult<ExecutionRecord?>(null);
         public Task<IReadOnlyList<ExecutionRecord>> GetByPromptVersionIdAsync(Guid promptVersionId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ExecutionRecord>>([]);
         public Task UpdateAsync(ExecutionRecord execution, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 

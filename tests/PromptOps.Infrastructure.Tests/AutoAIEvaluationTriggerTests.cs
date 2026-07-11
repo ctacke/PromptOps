@@ -142,6 +142,7 @@ public class AutoAIEvaluationTriggerTests
         public Task AddAsync(AIEvaluation evaluation, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<IReadOnlyList<AIEvaluation>> GetByExecutionIdAsync(Guid executionId, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<AIEvaluation>>([]);
+        public Task<int> GetCountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 

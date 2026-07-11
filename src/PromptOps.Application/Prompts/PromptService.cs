@@ -130,6 +130,17 @@ public sealed class PromptService(IPromptRepository repository, IEmbeddingProvid
     public Task<IReadOnlyList<PromptSummary>> ListAsync(CancellationToken cancellationToken = default)
         => repository.GetAllNamesAsync(cancellationToken);
 
+    /// <summary>Loads a single version's full content — reuses <see cref="IPromptRepository.GetByVersionIdAsync"/> (Phase 11's <c>AutoPromotionTrigger</c> lookup), the only existing query that already loads content from just a version id.</summary>
+    public async Task<PromptVersionDetail?> GetVersionDetailAsync(Guid versionId, CancellationToken cancellationToken = default)
+    {
+        var prompt = await repository.GetByVersionIdAsync(versionId, cancellationToken);
+        var version = prompt?.Versions.FirstOrDefault(v => v.Id == versionId);
+        if (prompt is null || version is null)
+            return null;
+
+        return new PromptVersionDetail(prompt.Id, prompt.Name, version.Id, version.VersionNumber, version.Content, version.Status, prompt.Metadata.Tags);
+    }
+
     private async Task<Prompt> GetOrThrowAsync(Guid promptId, CancellationToken cancellationToken)
         => await repository.GetByIdAsync(promptId, cancellationToken)
            ?? throw new PromptNotFoundException(promptId);

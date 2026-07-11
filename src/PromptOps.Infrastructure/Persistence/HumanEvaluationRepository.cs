@@ -27,6 +27,9 @@ public sealed class HumanEvaluationRepository(PromptOpsDbContext db) : IHumanEva
         return entities.OrderBy(e => e.Timestamp).Select(HumanEvaluationMapper.ToDomain).ToList();
     }
 
+    public Task<int> GetCountAsync(CancellationToken cancellationToken = default)
+        => db.HumanEvaluations.AsNoTracking().CountAsync(cancellationToken);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => db.SaveChangesAsync(cancellationToken);
 }

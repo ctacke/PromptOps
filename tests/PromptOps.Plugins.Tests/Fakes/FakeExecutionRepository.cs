@@ -21,6 +21,8 @@ internal sealed class FakeExecutionRepository : IExecutionRepository
     public Task<IReadOnlyList<ExecutionRecord>> GetByPromptVersionIdAsync(Guid promptVersionId, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<ExecutionRecord>>(_executions.Values.Where(e => e.PromptVersionId == promptVersionId).ToList());
 
+    public Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
     public Task UpdateAsync(ExecutionRecord execution, CancellationToken cancellationToken = default)
     {
         _executions[execution.Id] = execution;

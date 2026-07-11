@@ -56,6 +56,12 @@ public static class PromptEndpoints
             }
         });
 
+        app.MapGet("/prompt-versions/{versionId:guid}", async (Guid versionId, PromptService service, CancellationToken cancellationToken) =>
+        {
+            var detail = await service.GetVersionDetailAsync(versionId, cancellationToken);
+            return detail is null ? Results.NotFound() : Results.Ok(PromptVersionDetailResponse.From(detail));
+        });
+
         app.MapPost("/prompts/{promptId:guid}/versions/{versionId:guid}/activate", async (
             Guid promptId, Guid versionId, PromptService service, CancellationToken cancellationToken) =>
         {
@@ -127,4 +133,11 @@ internal sealed record PromptVersionResponse(
 {
     public static PromptVersionResponse From(PromptVersion version) => new(
         version.Id, version.PromptId, version.VersionNumber, version.Content, version.ChangelogEntry, version.Status, version.CreatedAt);
+}
+
+internal sealed record PromptVersionDetailResponse(
+    Guid PromptId, string PromptName, Guid VersionId, int VersionNumber, string Content, PromptVersionStatus Status, IReadOnlyList<string> Tags)
+{
+    public static PromptVersionDetailResponse From(PromptVersionDetail detail) => new(
+        detail.PromptId, detail.PromptName, detail.VersionId, detail.VersionNumber, detail.Content, detail.Status, detail.Tags);
 }

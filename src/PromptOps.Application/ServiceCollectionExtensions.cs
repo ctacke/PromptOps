@@ -7,6 +7,7 @@ using PromptOps.Application.Promotion;
 using PromptOps.Application.Prompts;
 using PromptOps.Application.Recommendations;
 using PromptOps.Application.Scoring;
+using PromptOps.Application.Statistics;
 
 namespace PromptOps.Application;
 
@@ -24,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ScoringService>();
         services.AddScoped<RecommendationService>();
         services.AddScoped<PromotionPolicyService>();
+        services.AddScoped<StatisticsService>();
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         return services;
     }

@@ -8,5 +8,8 @@ public interface IAIEvaluationRepository
 
     Task<IReadOnlyList<AIEvaluation>> GetByExecutionIdAsync(Guid executionId, CancellationToken cancellationToken = default);
 
+    /// <summary>Total count across every execution, computed in SQL.</summary>
+    Task<int> GetCountAsync(CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

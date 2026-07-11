@@ -198,6 +198,8 @@ public class WeightedSumScoringProviderTests
             return Task.CompletedTask;
         }
 
+        public Task<ExecutionStatistics> GetStatisticsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
@@ -228,6 +230,8 @@ public class WeightedSumScoringProviderTests
         public Task<IReadOnlyList<HumanEvaluation>> GetByExecutionIdAsync(Guid executionId, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<HumanEvaluation>>(_byExecution.GetValueOrDefault(executionId) ?? []);
 
+        public Task<int> GetCountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
@@ -242,6 +246,8 @@ public class WeightedSumScoringProviderTests
 
         public Task<IReadOnlyList<AIEvaluation>> GetByExecutionIdAsync(Guid executionId, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<AIEvaluation>>(_byExecution.GetValueOrDefault(executionId) ?? []);
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
