@@ -108,6 +108,44 @@ Now, any prompt version that achieves a score above 85 based on build success, t
 
 ---
 
+## Upgrading an Existing Installation
+
+Upgrades are simple and split into two independent parts: upgrading the shared daemon on your machine, and updating the plugin in your specific project repositories. **Your data is safe:** all prompts, version histories, execution logs, and configurations survive updates.
+
+### 1. Upgrade the Daemon (Once per machine)
+
+If you are running the pre-built GHCR image, pull the latest version and recreate the container:
+
+```bash
+docker pull ghcr.io/ctacke/promptops:latest
+docker stop promptops-daemon
+docker rm promptops-daemon
+docker run -d --name promptops-daemon --restart unless-stopped -p 127.0.0.1:5179:8080 -v promptops-data:/data ghcr.io/ctacke/promptops:latest
+```
+
+*Want to take a quick backup first just in case?* You can copy your SQLite database out of the volume with a single command:
+```bash
+docker cp promptops-daemon:/data/promptops.db ./promptops-backup.db
+```
+
+If you built from source instead of running the GHCR image, just pull the latest commits and rebuild:
+```bash
+git pull
+docker compose up -d --build
+```
+
+### 2. Upgrade the Plugin (Per repository)
+
+To update the session hooks and commands in a specific project, open a Claude Code session in that repository and run:
+
+```
+claude plugin marketplace update promptops
+```
+
+*Tip:* After upgrading, run `/reload-plugins` to load the updated hooks and commands into your active session.
+
+---
+
 ## Where to Go Next
 
 *   [daemon-setup.md](file:///F:/repos/ctacke/PromptOps/docs/daemon-setup.md) — Advanced setup details, backing up your database, and connecting Sonar or CI plugins.
