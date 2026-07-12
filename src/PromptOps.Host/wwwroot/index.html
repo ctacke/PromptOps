@@ -934,25 +934,25 @@
       }
 
       container.innerHTML = promptCatalogCache.map(p => {
-        const isActive = p.Id === selectedPromptId;
-        const activeClass = isActive 
-          ? 'border-purple-500/50 bg-purple-500/5 shadow-lg shadow-purple-500/5' 
+        const isActive = p.id === selectedPromptId;
+        const activeClass = isActive
+          ? 'border-purple-500/50 bg-purple-500/5 shadow-lg shadow-purple-500/5'
           : 'border-slate-800/60 hover:bg-slate-900/20';
 
-        const scoreBadge = p.ActiveVersionScore != null 
-          ? `<span class="px-2 py-0.5 text-xs font-bold font-mono rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">${p.ActiveVersionScore.toFixed(0)}%</span>`
+        const scoreBadge = p.activeVersionScore != null
+          ? `<span class="px-2 py-0.5 text-xs font-bold font-mono rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">${p.activeVersionScore.toFixed(0)}%</span>`
           : `<span class="px-2 py-0.5 text-xs font-mono rounded bg-slate-900 text-slate-500 border border-slate-800">Unscored</span>`;
 
         return `
-          <div onclick="showPromptDetails('${p.Id}')" class="glass-panel rounded-xl p-4 cursor-pointer border transition-all duration-200 select-none ${activeClass}">
+          <div onclick="showPromptDetails('${p.id}')" class="glass-panel rounded-xl p-4 cursor-pointer border transition-all duration-200 select-none ${activeClass}">
             <div class="flex justify-between items-start mb-2">
-              <h4 class="font-title font-bold text-slate-200 tracking-tight">${p.Name}</h4>
+              <h4 class="font-title font-bold text-slate-200 tracking-tight">${p.name}</h4>
               ${scoreBadge}
             </div>
-            <p class="text-xs text-slate-400 leading-normal line-clamp-2">${p.Description || 'No description available.'}</p>
+            <p class="text-xs text-slate-400 leading-normal line-clamp-2">${p.description || 'No description available.'}</p>
             <div class="flex items-center justify-between mt-3 text-[10px] text-slate-500 font-mono">
-              <span class="bg-slate-950 px-1.5 py-0.5 border border-slate-900 rounded">v${p.ActiveVersionNumber || 'Draft'} Active</span>
-              <span>${p.VersionCount} version${p.VersionCount > 1 ? 's' : ''}</span>
+              <span class="bg-slate-950 px-1.5 py-0.5 border border-slate-900 rounded">v${p.activeVersionNumber || 'Draft'} Active</span>
+              <span>${p.versionCount} version${p.versionCount > 1 ? 's' : ''}</span>
             </div>
           </div>
         `;
@@ -961,32 +961,32 @@
 
     function showPromptDetails(promptId) {
       selectedPromptId = promptId;
-      
+
       // Refresh highlighted list border without full reload
       renderPromptsList();
 
-      const prompt = promptCatalogCache.find(p => p.Id === promptId);
+      const prompt = promptCatalogCache.find(p => p.id === promptId);
       if (!prompt) return;
 
       document.getElementById('prompt-detail-empty').classList.add('hidden');
       document.getElementById('prompt-detail-container').classList.remove('hidden');
 
-      document.getElementById('detail-prompt-name').innerText = prompt.Name;
-      document.getElementById('detail-prompt-id').innerText = prompt.Id;
-      document.getElementById('detail-prompt-desc').innerText = prompt.Description;
-      
+      document.getElementById('detail-prompt-name').innerText = prompt.name;
+      document.getElementById('detail-prompt-id').innerText = prompt.id;
+      document.getElementById('detail-prompt-desc').innerText = prompt.description;
+
       // Render Tags
       const tagsContainer = document.getElementById('detail-prompt-tags');
-      tagsContainer.innerHTML = prompt.Tags.map(t => 
+      tagsContainer.innerHTML = prompt.tags.map(t =>
         `<span class="px-2 py-0.5 text-[10px] uppercase font-mono font-bold tracking-wider rounded-full bg-slate-900 border border-slate-800 text-slate-400">${t}</span>`
       ).join('') || `<span class="text-xs text-slate-600 font-mono italic">No tags associated</span>`;
 
       // Render Versions table/list
       const versionsContainer = document.getElementById('detail-versions-list');
-      versionsContainer.innerHTML = prompt.Versions.map(v => {
-        const isSelected = v.Id === selectedVersionId;
-        const selectedClass = isSelected 
-          ? 'border-purple-500/40 bg-purple-950/20' 
+      versionsContainer.innerHTML = prompt.versions.map(v => {
+        const isSelected = v.id === selectedVersionId;
+        const selectedClass = isSelected
+          ? 'border-purple-500/40 bg-purple-950/20'
           : 'border-slate-800 hover:bg-slate-900/30';
 
         const statusBadges = {
@@ -994,27 +994,27 @@
           Draft: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
           Deprecated: 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
         };
-        const statusClass = statusBadges[v.Status] || 'bg-slate-800 text-slate-500';
+        const statusClass = statusBadges[v.status] || 'bg-slate-800 text-slate-500';
 
-        const promoteAction = v.Status === 'Draft' 
-          ? `<button onclick="promoteVersion('${prompt.Id}', '${v.Id}', event)" class="px-2 py-0.5 rounded text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all">Promote</button>`
+        const promoteAction = v.status === 'Draft'
+          ? `<button onclick="promoteVersion('${prompt.id}', '${v.id}', event)" class="px-2 py-0.5 rounded text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all">Promote</button>`
           : '';
 
         return `
-          <div onclick="selectVersion('${v.Id}')" class="flex justify-between items-center p-3 border rounded-lg cursor-pointer transition-all duration-205 select-none ${selectedClass}">
+          <div onclick="selectVersion('${v.id}')" class="flex justify-between items-center p-3 border rounded-lg cursor-pointer transition-all duration-205 select-none ${selectedClass}">
             <div class="space-y-1">
               <div class="flex items-center space-x-2">
-                <span class="font-mono text-xs text-slate-300 font-bold">Version ${v.VersionNumber}</span>
-                <span class="text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold uppercase tracking-wider ${statusClass}">${v.Status}</span>
+                <span class="font-mono text-xs text-slate-300 font-bold">Version ${v.versionNumber}</span>
+                <span class="text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold uppercase tracking-wider ${statusClass}">${v.status}</span>
               </div>
               <div class="text-[10px] text-slate-500 font-mono">
-                Created by ${v.CreatedBy || 'Unknown'} · ${new Date(v.CreatedAt).toLocaleDateString()}
+                Created by ${v.createdBy || 'Unknown'} · ${new Date(v.createdAt).toLocaleDateString()}
               </div>
-              ${v.ChangelogEntry ? `<div class="text-[10px] text-slate-400 font-mono italic max-w-[280px] truncate" title="${v.ChangelogEntry}">${v.ChangelogEntry}</div>` : ''}
+              ${v.changelogEntry ? `<div class="text-[10px] text-slate-400 font-mono italic max-w-[280px] truncate" title="${v.changelogEntry}">${v.changelogEntry}</div>` : ''}
             </div>
-            
+
             <div class="flex items-center space-x-3">
-              <span class="font-mono text-sm font-bold text-slate-300">${v.Score != null ? v.Score.toFixed(0) + '%' : 'N/A'}</span>
+              <span class="font-mono text-sm font-bold text-slate-300">${v.score != null ? v.score.toFixed(0) + '%' : 'N/A'}</span>
               ${promoteAction}
             </div>
           </div>
@@ -1022,9 +1022,9 @@
       }).join('');
 
       // Auto-select latest or active version on first view
-      if (!selectedVersionId || !prompt.Versions.some(v => v.Id === selectedVersionId)) {
-        const defaultVer = prompt.Versions.find(v => v.Status === 'Active') || prompt.Versions[0];
-        if (defaultVer) selectVersion(defaultVer.Id);
+      if (!selectedVersionId || !prompt.versions.some(v => v.id === selectedVersionId)) {
+        const defaultVer = prompt.versions.find(v => v.status === 'Active') || prompt.versions[0];
+        if (defaultVer) selectVersion(defaultVer.id);
       } else {
         selectVersion(selectedVersionId);
       }
@@ -1032,45 +1032,45 @@
 
     function selectVersion(versionId) {
       selectedVersionId = versionId;
-      
+
       // Update styling in the list
-      const prompt = promptCatalogCache.find(p => p.Id === selectedPromptId);
+      const prompt = promptCatalogCache.find(p => p.id === selectedPromptId);
       if (!prompt) return;
 
       // Update detail border highlights
       showPromptDetails(selectedPromptId);
 
-      const version = prompt.Versions.find(v => v.Id === versionId);
+      const version = prompt.versions.find(v => v.id === versionId);
       if (!version) return;
 
       // Populate text panel
-      document.getElementById('detail-version-content').innerText = version.Content;
-      
+      document.getElementById('detail-version-content').innerText = version.content;
+
       // Show/Hide Compare with Active button
-      const activeVer = prompt.Versions.find(v => v.Status === 'Active');
+      const activeVer = prompt.versions.find(v => v.status === 'Active');
       const btnCompare = document.getElementById('btn-compare-active');
-      if (activeVer && activeVer.Id !== version.Id) {
+      if (activeVer && activeVer.id !== version.id) {
         btnCompare.classList.remove('hidden');
       } else {
         btnCompare.classList.add('hidden');
       }
 
       // Populate analytics box
-      document.getElementById('analytics-version-tag').innerText = `Version ${version.VersionNumber}`;
-      document.getElementById('analytics-score').innerText = version.Score != null 
-        ? version.Score.toFixed(1) + '%' 
+      document.getElementById('analytics-version-tag').innerText = `Version ${version.versionNumber}`;
+      document.getElementById('analytics-score').innerText = version.score != null
+        ? version.score.toFixed(1) + '%'
         : 'No Score';
-      document.getElementById('analytics-score').className = version.Score != null
+      document.getElementById('analytics-score').className = version.score != null
         ? "font-mono font-bold text-lg text-purple-400"
         : "font-mono font-bold text-lg text-slate-500";
 
       const compContainer = document.getElementById('analytics-components-container');
-      if (!version.ComponentScores || Object.keys(version.ComponentScores).length === 0) {
+      if (!version.componentScores || Object.keys(version.componentScores).length === 0) {
         compContainer.innerHTML = `<div class="text-[11px] font-mono text-slate-600 italic py-2">No components evaluations evaluated yet. Run rates/builds to calculate stats.</div>`;
         return;
       }
 
-      compContainer.innerHTML = Object.entries(version.ComponentScores).map(([key, val]) => {
+      compContainer.innerHTML = Object.entries(version.componentScores).map(([key, val]) => {
         const pct = val * 100;
         return `
           <div class="space-y-1">
@@ -1105,7 +1105,7 @@
 
     // Modal Draft prompt submission
     function openCreateVersionModal() {
-      const prompt = promptCatalogCache.find(p => p.Id === selectedPromptId);
+      const prompt = promptCatalogCache.find(p => p.id === selectedPromptId);
       if (!prompt) return;
       
       document.getElementById('new-version-changelog').value = '';
@@ -1203,18 +1203,18 @@
 
     // Diff compare algorithm
     function compareWithActive() {
-      const prompt = promptCatalogCache.find(p => p.Id === selectedPromptId);
+      const prompt = promptCatalogCache.find(p => p.id === selectedPromptId);
       if (!prompt) return;
 
-      const activeVer = prompt.Versions.find(v => v.Status === 'Active');
-      const selectedVer = prompt.Versions.find(v => v.Id === selectedVersionId);
+      const activeVer = prompt.versions.find(v => v.status === 'Active');
+      const selectedVer = prompt.versions.find(v => v.id === selectedVersionId);
 
       if (!activeVer || !selectedVer) return;
 
-      document.getElementById('diff-subtitle').innerText = `Comparing Version ${selectedVer.VersionNumber} (Selected) vs Version ${activeVer.VersionNumber} (Active)`;
-      
+      document.getElementById('diff-subtitle').innerText = `Comparing Version ${selectedVer.versionNumber} (Selected) vs Version ${activeVer.versionNumber} (Active)`;
+
       // Calculate diffs
-      const diff = Diff.diffLines(activeVer.Content, selectedVer.Content);
+      const diff = Diff.diffLines(activeVer.content, selectedVer.content);
       const container = document.getElementById('diff-output-container');
       
       container.innerHTML = diff.map(part => {

@@ -155,11 +155,12 @@ public static class DashboardEndpoints
                 .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.ExecutionId == id, cancellationToken);
 
-            var latestScore = await db.PromptScores
+            var latestScore = (await db.PromptScores
                 .AsNoTracking()
                 .Where(s => s.PromptVersionId == execution.PromptVersionId)
+                .ToListAsync(cancellationToken))
                 .OrderByDescending(s => s.ComputedAt)
-                .FirstOrDefaultAsync(cancellationToken);
+                .FirstOrDefault();
 
             var response = new
             {
