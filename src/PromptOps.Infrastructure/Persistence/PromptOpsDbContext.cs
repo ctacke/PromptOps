@@ -15,6 +15,8 @@ public sealed class PromptOpsDbContext(DbContextOptions<PromptOpsDbContext> opti
     public DbSet<EmbeddingEntity> Embeddings => Set<EmbeddingEntity>();
     public DbSet<PromotionPolicyEntity> PromotionPolicies => Set<PromotionPolicyEntity>();
     public DbSet<AIEvaluationPolicyEntity> AIEvaluationPolicies => Set<AIEvaluationPolicyEntity>();
+    public DbSet<RefinementPolicyEntity> RefinementPolicies => Set<RefinementPolicyEntity>();
+    public DbSet<RefinementCandidateEntity> RefinementCandidates => Set<RefinementCandidateEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -249,6 +249,80 @@ against a locally-running daemon.
 
 **Docs:** [`docs/execution-attribution.md`](./execution-attribution.md).
 
+## Phase 16 — Autonomous Prompt Refinement
+
+Closes the improvement loop: the AI judge already produces `SuggestedPromptImprovements`, but nothing
+consumed them and `AutoPromotionTrigger` had no Draft candidate to act on. Shipped in three
+sub-phases; full design in [`docs/prompt-refinement.md`](./prompt-refinement.md).
+
+### Phase 16a — Draft the improvement (complete)
+
+**Deliverables**
+- `RefinementPolicy` singleton (`AutoRefinementEnabled`, default off) + repository/service, `GET/PUT
+  /refinement-policy`, and `get/update_refinement_policy` MCP tools.
+- `IPromptRefinementProvider` + `AIPromptRefinementProvider` (built on `IAIExecutionProvider`, same
+  pattern as the judge/classifier).
+- `PromptRefinementService.RefineFromEvaluationAsync` — guards (untracked/non-active/dedup/no-change)
+  then drafts a new Draft version via `PromptService.CreateVersionAsync`.
+- `PromptRefinementTrigger : IDomainEventHandler<AIEvaluationRecorded>` — fast policy check, detached
+  scoped work, mirroring `AutoAIEvaluationTrigger`.
+- `AddRefinementPolicy` EF migration.
+
+**Acceptance criteria**
+- With the policy on, recording an AI evaluation that has suggestions for an attributed, active
+  prompt drafts exactly one new Draft version (parented to the active version, `createdBy =
+  promptops-refinement`); a second evaluation does not pile on a second draft.
+- Untracked executions, non-active versions, and empty/blank refinements never draft.
+- With the policy off (default), behavior is unchanged.
+
+**Testing:** `RefinementPolicyTests`, `PromptRefinementServiceTests`, `PromptRefinementTriggerTests`,
+`AIPromptRefinementProviderTests`, `RefinementPolicyEndpointsTests`.
+
+### Phase 16b — Synthetic-benchmark pre-screen (complete)
+
+**Deliverables**
+- `RefinementPolicy` += `SyntheticSampleSize` / `MinQualityDelta` (both default 0 → benchmarking off).
+- `IPromptBenchmarkProvider` + `AIPromptBenchmarkProvider` (built on `IAIExecutionProvider`): generate
+  scenarios → run active + candidate on each → grade both → per-version averages (`null` = inconclusive).
+- `RefinementCandidate` entity (`PendingBenchmark` / `AbEligible` / `Rejected`) + repository, entity/
+  config/mapper, and the `AddSyntheticBenchmark` EF migration (policy columns + `RefinementCandidates`).
+- `PromptBenchmarkService.BenchmarkCandidateAsync` — the gate: pass → `AbEligible` (draft kept),
+  regress/miss-margin → `Rejected` (draft **Deprecated**), disabled/inconclusive → `PendingBenchmark`.
+- `PromptRefinementTrigger` chains benchmark after a successful draft, in the same detached task.
+
+**Acceptance criteria**
+- A draft that beats the active version by the margin on the synthetic benchmark becomes A/B-eligible;
+  one that regresses (or doesn't clear the margin) is rejected and its Draft version deprecated.
+- With benchmarking disabled (sample size 0, the default) or an inconclusive benchmark, the draft is
+  left pending for manual review — never deprecated on no evidence.
+
+**Testing:** `PromptBenchmarkServiceTests`, `AIPromptBenchmarkProviderTests`, `RefinementCandidateTests`,
+extended `RefinementPolicyTests`/`RefinementPolicyEndpointsTests`/`PromptRefinementTriggerTests`.
+
+### Phase 16c — A/B shadow adoption (complete)
+
+**Deliverables**
+- `RefinementPolicy` += `AbExplorationRate` (0-1, default 0) + `AddAbExplorationRate` migration.
+- `IExplorationSampler` (+ `RandomExplorationSampler`) — the ε coin flip behind a testable port.
+- `AbVersionSelector` — with probability `AbExplorationRate`, routes to an `AbEligible`
+  `RefinementCandidate`'s draft instead of the active version.
+- `ExecutionAttributionService` applies `AbVersionSelector` in its recommend branch, so a fraction of
+  real sessions are attributed to the eligible draft (giving it live traffic to be scored on). The
+  downstream is unchanged: `ScoreRecomputeTrigger` → `ScoreComputed(draft)` → `AutoPromotionTrigger`
+  promotes on evidence — no new promotion logic.
+
+**Acceptance criteria**
+- With `AbExplorationRate > 0` and an `AbEligible` draft, a matching session is (probabilistically, and
+  deterministically at rate 1.0) attributed to the draft and served its content; at rate 0 it always
+  uses the active version.
+- A draft that accrues a winning score is promoted by the existing `AutoPromotionTrigger`; once
+  promoted, shadow routing stops (A/B lookups key on the new active version).
+- Fully autonomous adoption requires the refinement + promotion policies opted in together; all knobs
+  default off, so existing behavior is unchanged.
+
+**Testing:** `AbVersionSelectorTests`, extended `RefinementPolicyTests`/`RefinementPolicyEndpointsTests`,
+and `ExecutionAttributionEndpointsTests` (routed-to-draft vs. active over real HTTP).
+
 ## Phase 14+ (each re-planned in detail when reached)
 
 - Additional daemon-side context/metric plugins: Jira, GitHub, Azure DevOps, ADR/spec document providers (network-reachable ones only — filesystem-bound sources stay hook-pushed per ADR-0005/Phase 3).

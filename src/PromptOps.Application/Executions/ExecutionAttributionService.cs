@@ -38,7 +38,8 @@ public sealed class ExecutionAttributionService(
     IActivityClassifier classifier,
     IPromptRepository promptRepository,
     PromptService promptService,
-    ExecutionService executionService)
+    ExecutionService executionService,
+    Refinement.AbVersionSelector abVersionSelector)
 {
     /// <summary>The all-zeros sentinel meaning "no prompt version" — mirrors the plugin's <c>UNTRACKED_PROMPT_VERSION_ID</c> (claude-plugin/hooks/lib/state.mjs).</summary>
     public static readonly Guid UntrackedPromptVersionId = Guid.Empty;
@@ -74,10 +75,18 @@ public sealed class ExecutionAttributionService(
 
         if (match is not null)
         {
-            var detail = await promptService.GetVersionDetailAsync(match.PromptVersionId, cancellationToken);
-            var execution = await executionService.StartExecutionAsync(match.PromptVersionId, developerId, context, inputs: null, cancellationToken);
-            var rationale = $"Matched existing prompt '{match.Name}' on activity tag(s): {string.Join(", ", MatchingTags(match.Tags, tags))}.";
-            return new AttributedExecution(execution.Id, match.PromptVersionId, AttributionKind.Recommended, detail?.Content, rationale);
+            // Phase 16c: with probability RefinementPolicy.AbExplorationRate, route this session to an
+            // A/B-eligible refined draft of the matched prompt instead of its active version, so the
+            // draft earns a real score from live traffic (AutoPromotionTrigger then promotes on evidence).
+            var versionId = await abVersionSelector.SelectVersionAsync(match.PromptVersionId, cancellationToken);
+            var exploring = versionId != match.PromptVersionId;
+
+            var detail = await promptService.GetVersionDetailAsync(versionId, cancellationToken);
+            var execution = await executionService.StartExecutionAsync(versionId, developerId, context, inputs: null, cancellationToken);
+            var rationale = exploring
+                ? $"Trying an experimental refined variant of '{match.Name}' (A/B shadow traffic) to evaluate whether it outperforms the current version."
+                : $"Matched existing prompt '{match.Name}' on activity tag(s): {string.Join(", ", MatchingTags(match.Tags, tags))}.";
+            return new AttributedExecution(execution.Id, versionId, AttributionKind.Recommended, detail?.Content, rationale);
         }
 
         // Development task with no prompt for this activity → capture the developer's prompt as one.

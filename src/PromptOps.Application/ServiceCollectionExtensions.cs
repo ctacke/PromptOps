@@ -6,6 +6,7 @@ using PromptOps.Application.Metrics;
 using PromptOps.Application.Promotion;
 using PromptOps.Application.Prompts;
 using PromptOps.Application.Recommendations;
+using PromptOps.Application.Refinement;
 using PromptOps.Application.Scoring;
 using PromptOps.Application.Statistics;
 
@@ -26,6 +27,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ScoringService>();
         services.AddScoped<RecommendationService>();
         services.AddScoped<PromotionPolicyService>();
+        services.AddScoped<RefinementPolicyService>();
+        services.AddScoped<PromptRefinementService>();
+        services.AddScoped<PromptBenchmarkService>();
+        services.AddScoped<AbVersionSelector>();
         services.AddScoped<StatisticsService>();
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         return services;

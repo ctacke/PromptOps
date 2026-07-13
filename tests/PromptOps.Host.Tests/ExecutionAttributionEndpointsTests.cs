@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using PromptOps.Application.Prompts;
+using PromptOps.Application.Refinement;
+using PromptOps.Domain.Refinement;
 using Xunit;
 
 namespace PromptOps.Host.Tests;
@@ -118,7 +120,48 @@ public class ExecutionAttributionEndpointsTests : IClassFixture<WebApplicationFa
         Assert.Equal(firstResult.PromptVersionId, secondResult.PromptVersionId);
     }
 
+    [Fact]
+    public async Task With_Ab_Exploration_A_Session_Is_Routed_To_The_Eligible_Draft()
+    {
+        // An active "Debugging" prompt plus a benchmark-passing (AbEligible) refined draft, and a
+        // policy that routes 100% of traffic to it — the deterministic end of the ε-greedy range.
+        var (promptId, activeId) = await SeedActivePromptWithIdsAsync("Debug Helper", ["debugging"], "active content");
+        var draftId = await SeedEligibleDraftAsync(promptId, activeId, "REFINED debugging content");
+        await SetExplorationRateAsync(1.0);
+
+        var response = await _client.PostAsJsonAsync("/executions/start-attributed",
+            Request("debug this crash", ["debugging"]));
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<AttributedResponse>();
+
+        Assert.Equal("recommended", result!.Attribution);
+        Assert.Equal(draftId, result.PromptVersionId); // routed to the draft, not the active version
+        Assert.Equal("REFINED debugging content", result.Content);
+    }
+
+    [Fact]
+    public async Task Without_Ab_Exploration_A_Session_Uses_The_Active_Version()
+    {
+        var (promptId, activeId) = await SeedActivePromptWithIdsAsync("Debug Helper", ["debugging"], "active content");
+        await SeedEligibleDraftAsync(promptId, activeId, "REFINED debugging content");
+        // Default policy: AbExplorationRate = 0 → never routes to the draft.
+
+        var response = await _client.PostAsJsonAsync("/executions/start-attributed",
+            Request("debug this crash", ["debugging"]));
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<AttributedResponse>();
+
+        Assert.Equal(activeId, result!.PromptVersionId);
+        Assert.Equal("active content", result.Content);
+    }
+
     private async Task<Guid> SeedActivePromptAsync(string name, string[] tags, string content)
+    {
+        var (_, versionId) = await SeedActivePromptWithIdsAsync(name, tags, content);
+        return versionId;
+    }
+
+    private async Task<(Guid PromptId, Guid ActiveVersionId)> SeedActivePromptWithIdsAsync(string name, string[] tags, string content)
     {
         using var scope = _factory.Services.CreateScope();
         var promptService = scope.ServiceProvider.GetRequiredService<PromptService>();
@@ -127,7 +170,28 @@ public class ExecutionAttributionEndpointsTests : IClassFixture<WebApplicationFa
         await promptService.TagPromptAsync(prompt.Id, tags);
         var version = await promptService.CreateVersionAsync(prompt.Id, content, "alice");
         await promptService.ActivateVersionAsync(prompt.Id, version.Id);
-        return version.Id;
+        return (prompt.Id, version.Id);
+    }
+
+    private async Task<Guid> SeedEligibleDraftAsync(Guid promptId, Guid activeVersionId, string draftContent)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var promptService = scope.ServiceProvider.GetRequiredService<PromptService>();
+        var candidateRepository = scope.ServiceProvider.GetRequiredService<IRefinementCandidateRepository>();
+
+        var draft = await promptService.CreateVersionAsync(promptId, draftContent, "promptops-refinement");
+        var candidate = RefinementCandidate.Create(promptId, draft.Id, activeVersionId);
+        candidate.MarkEligible(activeScore: 70, candidateScore: 85);
+        await candidateRepository.AddAsync(candidate);
+        await candidateRepository.SaveChangesAsync();
+        return draft.Id;
+    }
+
+    private async Task SetExplorationRateAsync(double rate)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var policyService = scope.ServiceProvider.GetRequiredService<RefinementPolicyService>();
+        await policyService.UpdateAsync(autoRefinementEnabled: false, syntheticSampleSize: 0, minQualityDelta: 0, abExplorationRate: rate);
     }
 
     public void Dispose()

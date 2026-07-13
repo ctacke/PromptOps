@@ -9,6 +9,7 @@ using PromptOps.Application.Metrics;
 using PromptOps.Application.Promotion;
 using PromptOps.Application.Prompts;
 using PromptOps.Application.Providers;
+using PromptOps.Application.Refinement;
 using PromptOps.Application.Scoring;
 using PromptOps.Domain.Evaluations;
 using PromptOps.Domain.Executions;
@@ -18,6 +19,7 @@ using PromptOps.Infrastructure.Evaluations;
 using PromptOps.Infrastructure.Persistence;
 using PromptOps.Infrastructure.Promotion;
 using PromptOps.Infrastructure.Providers;
+using PromptOps.Infrastructure.Refinement;
 using PromptOps.Infrastructure.Scoring;
 
 namespace PromptOps.Infrastructure;
@@ -50,6 +52,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISecretProvider, EnvironmentSecretProvider>();
         services.AddScoped<IPromotionPolicyRepository, PromotionPolicyRepository>();
         services.AddScoped<IAIEvaluationPolicyRepository, AIEvaluationPolicyRepository>();
+        services.AddScoped<IRefinementPolicyRepository, RefinementPolicyRepository>();
+        services.AddScoped<IRefinementCandidateRepository, RefinementCandidateRepository>();
+        services.AddScoped<IPromptRefinementProvider, AIPromptRefinementProvider>();
+        services.AddScoped<IPromptBenchmarkProvider, AIPromptBenchmarkProvider>();
+        services.AddSingleton<IExplorationSampler, RandomExplorationSampler>();
 
         // Recompute-on-event (debounced, Phase 8): one singleton scheduler, four domain event
         // registrations feeding it (see ScoreRecomputeTrigger's docs for why one class/four regs).
@@ -65,6 +72,10 @@ public static class ServiceCollectionExtensions
         // Automatic AI evaluation: a second handler for ExecutionRecorded, alongside
         // ScoreRecomputeTrigger — DomainEventPublisher resolves and invokes both.
         services.AddScoped<IDomainEventHandler<ExecutionRecorded>, AutoAIEvaluationTrigger>();
+
+        // Automatic prompt refinement (Phase 16a): a second handler for AIEvaluationRecorded,
+        // alongside ScoreRecomputeTrigger — drafts an improved version from the judge's suggestions.
+        services.AddScoped<IDomainEventHandler<AIEvaluationRecorded>, PromptRefinementTrigger>();
 
         return services;
     }

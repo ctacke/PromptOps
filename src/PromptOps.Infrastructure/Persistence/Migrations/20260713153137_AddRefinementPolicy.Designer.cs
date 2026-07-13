@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PromptOps.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using PromptOps.Infrastructure.Persistence;
 namespace PromptOps.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PromptOpsDbContext))]
-    partial class PromptOpsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260713153137_AddRefinementPolicy")]
+    partial class AddRefinementPolicy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -457,61 +460,12 @@ namespace PromptOps.Infrastructure.Persistence.Migrations
                     b.ToTable("PromptVersions", (string)null);
                 });
 
-            modelBuilder.Entity("PromptOps.Infrastructure.Persistence.Records.RefinementCandidateEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("TEXT");
-
-                    b.Property<double?>("ActiveScore")
-                        .HasColumnType("REAL");
-
-                    b.Property<Guid>("ActiveVersionId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<double?>("CandidateScore")
-                        .HasColumnType("REAL");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("DraftVersionId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTimeOffset?>("EvaluatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("PromptId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ActiveVersionId");
-
-                    b.HasIndex("DraftVersionId");
-
-                    b.ToTable("RefinementCandidates", (string)null);
-                });
-
             modelBuilder.Entity("PromptOps.Infrastructure.Persistence.Records.RefinementPolicyEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("TEXT");
 
-                    b.Property<double>("AbExplorationRate")
-                        .HasColumnType("REAL");
-
                     b.Property<bool>("AutoRefinementEnabled")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<double>("MinQualityDelta")
-                        .HasColumnType("REAL");
-
-                    b.Property<int>("SyntheticSampleSize")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
