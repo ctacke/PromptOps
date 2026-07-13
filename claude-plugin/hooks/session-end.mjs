@@ -27,6 +27,13 @@ if (!sessionId) process.exit(0);
 const execution = readJson(executionStatePath(sessionId));
 if (!execution) process.exit(0); // no active execution (daemon was down at SessionStart) — no-op
 
+// Pre-open state with no executionId (Phase 15): SessionStart recorded the diff baseline but no
+// prompt ever arrived, so no execution was opened. Nothing to finish — just clear the leftover file.
+if (!execution.executionId) {
+  removeFile(executionStatePath(sessionId));
+  process.exit(0);
+}
+
 const { filesChanged, linesAdded, linesDeleted } = diffStats(cwd || execution.cwd, execution.startedAtCommit);
 
 try {

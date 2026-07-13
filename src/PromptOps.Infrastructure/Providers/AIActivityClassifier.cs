@@ -53,6 +53,8 @@ public sealed class AIActivityClassifier(IAIExecutionProvider aiExecutionProvide
 
         Common tags include (but are not limited to): debugging, testing, code-authoring, refactoring, documentation, code-review, performance, security. Pick whichever tags genuinely apply — invent new lowercase, hyphenated tags if none of these fit.
 
+        If the task is NOT a software-development activity (e.g. a general-knowledge question, casual conversation, or anything a developer wouldn't do to a codebase), respond with an empty array: []. An empty array is the correct answer for non-development tasks — this is what keeps them from being tracked or captured as prompts (Phase 15).
+
         Respond with ONLY a JSON array of lowercase, hyphenated tag strings, no other text, no markdown fences. Example: ["debugging", "csharp"]
         """;
 

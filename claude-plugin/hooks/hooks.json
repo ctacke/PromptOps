@@ -1,5 +1,5 @@
 {
-  "description": "PromptOps execution tracking — starts an ExecutionRecord on SessionStart, streams tool-usage stats via PreToolUse/PostToolUse, finalizes with diff stats on SessionEnd.",
+  "description": "PromptOps execution tracking — captures the diff baseline on SessionStart, opens an ExecutionRecord attributed to a real prompt version on the first UserPromptSubmit, streams tool-usage stats via PreToolUse/PostToolUse, and finalizes with diff stats on SessionEnd.",
   "hooks": {
     "SessionStart": [
       {
@@ -9,6 +9,18 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs\"",
             "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/user-prompt-submit.mjs\"",
+            "timeout": 20000
           }
         ]
       }

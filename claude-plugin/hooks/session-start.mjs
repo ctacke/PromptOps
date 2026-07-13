@@ -9,10 +9,9 @@ import {
   emitHookOutput,
   writeJson,
   readJson,
-  removeFile,
-  UNTRACKED_PROMPT_VERSION_ID
+  removeFile
 } from "./lib/state.mjs";
-import { getRepository, getBranch, getCommit, getDeveloperId, detectLanguages, diffStats } from "./lib/git.mjs";
+import { getCommit, diffStats } from "./lib/git.mjs";
 
 const input = await readStdinJson();
 const { session_id: sessionId, cwd } = input;
@@ -67,40 +66,11 @@ if (stale && stale.executionId) {
   }
 }
 
-const startedAtCommit = getCommit(cwd);
-
-let executionId = null;
-try {
-  const response = await fetchWithTimeout(
-    `${daemonUrl()}/executions/start`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        promptVersionId: UNTRACKED_PROMPT_VERSION_ID,
-        developerId: getDeveloperId(cwd),
-        repository: getRepository(cwd),
-        branch: getBranch(cwd),
-        commit: startedAtCommit,
-        languages: detectLanguages(cwd)
-      })
-    },
-    3000
-  );
-  if (response.ok) {
-    const body = await response.json();
-    executionId = body.executionId;
-  }
-} catch {
-  executionId = null;
-}
-
-if (!executionId) {
-  emitHookOutput("SessionStart", {
-    additionalContext: "PromptOps: the daemon is reachable but starting an execution failed. Tool usage and diff stats will not be recorded for this session."
-  });
-  process.exit(0);
-}
-
-writeJson(executionStatePath(sessionId), { executionId, startedAtCommit, cwd, startedAtMs: Date.now() });
+// Phase 15: don't open the ExecutionRecord here. It can't be attributed to a PromptVersion until
+// the developer's first prompt exists (and ExecutionRecord.PromptVersionId is immutable once the
+// record is created — see ExecutionAttributionService), so opening it at SessionStart is what forced
+// the old "untracked" placeholder. Instead, record a *pre-open* state file: it captures the diff
+// baseline (startedAtCommit) from the very start of the session, and the UserPromptSubmit hook then
+// opens the attributed execution on the first turn and writes executionId back into this file.
+writeJson(executionStatePath(sessionId), { startedAtCommit: getCommit(cwd), cwd, startedAtMs: Date.now() });
 process.exit(0);

@@ -35,6 +35,37 @@ public static class ExecutionEndpoints
             return Results.Ok(new StartExecutionResponse(execution.Id));
         });
 
+        // Phase 15: the attributed counterpart to /start. The hook's UserPromptSubmit calls this with
+        // the user's first prompt so the daemon can classify it, then either attribute the execution
+        // to an existing prompt, capture a new one for a novel development activity, or leave it
+        // untracked for non-development chatter — resolving the PromptVersion *before* opening the
+        // (immutable-once-created) ExecutionRecord.
+        group.MapPost("/start-attributed", async (StartAttributedRequest request, ExecutionAttributionService service, CancellationToken cancellationToken) =>
+        {
+            var context = new DevelopmentContext
+            {
+                Repository = request.Repository,
+                Branch = request.Branch,
+                Commit = request.Commit,
+                Languages = request.Languages ?? []
+            };
+
+            var result = await service.StartAttributedAsync(
+                taskDescription: request.Prompt,
+                rawPrompt: request.Prompt,
+                developerId: request.DeveloperId,
+                context: context,
+                parameters: request.Parameters,
+                cancellationToken: cancellationToken);
+
+            return Results.Ok(new StartAttributedResponse(
+                result.ExecutionId,
+                result.PromptVersionId,
+                result.Attribution.ToString().ToLowerInvariant(),
+                result.Content,
+                result.Rationale));
+        });
+
         group.MapPost("/{id:guid}/tool-usage", async (Guid id, RecordToolUsageRequest request, ExecutionService service, CancellationToken cancellationToken) =>
         {
             try
@@ -94,6 +125,22 @@ internal sealed record StartExecutionRequest(
     Dictionary<string, string>? Inputs);
 
 internal sealed record StartExecutionResponse(Guid ExecutionId);
+
+internal sealed record StartAttributedRequest(
+    string Prompt,
+    string DeveloperId,
+    string Repository,
+    string? Branch,
+    string? Commit,
+    List<string>? Languages,
+    Dictionary<string, string>? Parameters);
+
+internal sealed record StartAttributedResponse(
+    Guid ExecutionId,
+    Guid PromptVersionId,
+    string Attribution,
+    string? Content,
+    string? Rationale);
 
 internal sealed record RecordToolUsageRequest(string Name, int Count, long DurationMs);
 

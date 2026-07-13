@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<PromptService>();
         services.AddScoped<ExecutionService>();
+        services.AddScoped<ExecutionAttributionService>();
         services.AddScoped<MetricsCollectionService>();
         services.AddScoped<HumanEvaluationService>();
         services.AddScoped<AIEvaluationService>();

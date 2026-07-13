@@ -28,7 +28,7 @@ tests/
   PromptOps.Plugins.Tests        unit tests for the Sonar/BuildResult collectors
   PromptOps.Host.Tests           integration tests against the Host (WebApplicationFactory) + plugin loading
 claude-plugin/
-  hooks/    SessionStart/PreToolUse/PostToolUse/SessionEnd — capture execution context automatically
+  hooks/    SessionStart/UserPromptSubmit/PreToolUse/PostToolUse/SessionEnd — capture + attribute execution context automatically
   skills/   /promptops init|rate|evaluate|recommend|history|setup — anything that needs a human
 ```
 

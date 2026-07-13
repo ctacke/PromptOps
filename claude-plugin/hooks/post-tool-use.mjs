@@ -18,7 +18,10 @@ const { session_id: sessionId, tool_use_id: toolUseId, tool_name: toolName } = i
 if (!sessionId || !toolName) process.exit(0);
 
 const execution = readJson(executionStatePath(sessionId));
-if (!execution) process.exit(0); // no active execution (daemon was down at SessionStart) — no-op
+// No-op unless an execution has actually been opened: the state file is either absent (daemon was
+// down at SessionStart) or "pre-open" (written by SessionStart but not yet attributed/opened by the
+// first UserPromptSubmit — Phase 15), in which case there's no executionId to record usage against.
+if (!execution || !execution.executionId) process.exit(0);
 
 const timerPath = toolUseId ? toolTimerPath(sessionId, toolUseId) : null;
 const timer = timerPath ? readJson(timerPath) : null;

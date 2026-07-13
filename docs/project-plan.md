@@ -217,6 +217,38 @@ Two artifacts run through every phase from Phase 4 onward: the **daemon** (Docke
 
 **Docs:** `docs/ai-evaluation.md` (already updated with the design above), ADR-0010 amendment in `docs/architecture.md` (already recorded).
 
+## Phase 15 — Execution Attribution & Proactive Recommendation
+
+**Context:** Pulled forward ahead of the unscheduled Phase 14+ items because it is the prerequisite
+for any autonomous improvement loop: until an execution is tied to a real `PromptVersion`, none of
+the objective signal captured for free (diff churn, tool usage, build/test/Sonar metrics) attaches
+to a prompt, so scoring/recommendation learn nothing from passively-captured sessions. The plugin
+previously opened every execution against the all-zeros `UNTRACKED_PROMPT_VERSION_ID`. Full design:
+[`docs/execution-attribution.md`](./execution-attribution.md).
+
+**Deliverables**
+- `ExecutionAttributionService` (`PromptOps.Application.Executions`) + `POST /executions/start-attributed`:
+  classify-then-attribute, with three outcomes — untracked (non-development task), recommended
+  (existing prompt for the activity), captured (new prompt for a novel development activity).
+- New `UserPromptSubmit` hook that opens the attributed execution on the first prompt (attribution
+  must precede the immutable `ExecutionRecord.PromptVersionId`); `SessionStart` now records only a
+  pre-open diff baseline; `PostToolUse`/`SessionEnd` adjusted for the pre-open state.
+- `AIActivityClassifier` returns `[]` explicitly for non-development tasks (the untracked gate).
+
+**Acceptance criteria**
+- A development task with no matching prompt captures a new, Active prompt named for its activity and
+  attributes the execution to it; a subsequent same-activity task attributes to that captured prompt
+  rather than re-capturing.
+- A development task with a matching existing prompt attributes to it and surfaces its content
+  in-session (no slash command, no leaving the session).
+- A non-development task is left untracked (opened against `Guid.Empty`), creating no prompt.
+
+**Testing:** `ExecutionAttributionEndpointsTests` over real HTTP (all three branches + dedup),
+classification driven deterministically via `ManualAIExecutionProvider`; hook lifecycle verified
+against a locally-running daemon.
+
+**Docs:** [`docs/execution-attribution.md`](./execution-attribution.md).
+
 ## Phase 14+ (each re-planned in detail when reached)
 
 - Additional daemon-side context/metric plugins: Jira, GitHub, Azure DevOps, ADR/spec document providers (network-reachable ones only — filesystem-bound sources stay hook-pushed per ADR-0005/Phase 3).
